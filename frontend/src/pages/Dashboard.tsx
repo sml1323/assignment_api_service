@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { getEventAdmin, getContributions, createBook, createOrder, type Event, type Contribution } from '../lib/api';
 
 export default function Dashboard() {
   const { shareCode } = useParams<{ shareCode: string }>();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const token = searchParams.get('token') || '';
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -129,21 +130,29 @@ export default function Dashboard() {
         {contributions.length === 0 ? (
           <p className="text-gray-400 text-center py-8">아직 메시지가 없습니다. 링크를 공유해보세요!</p>
         ) : (
-          <div className="space-y-3">
-            {contributions.map((c) => (
-              <div key={c.id} className="border border-gray-100 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  {c.image_url && (
-                    <img src={c.image_url} alt="" className="w-20 h-20 object-cover rounded-lg shrink-0" />
-                  )}
-                  <div>
-                    <p className="font-medium text-gray-800">{c.contributor_name}</p>
-                    <p className="text-gray-600 text-sm mt-1">{c.message}</p>
+          <>
+            <div className="space-y-3">
+              {contributions.map((c) => (
+                <div key={c.id} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    {c.image_url && (
+                      <img src={c.image_url} alt="" className="w-20 h-20 object-cover rounded-lg shrink-0" />
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-800">{c.contributor_name}</p>
+                      <p className="text-gray-600 text-sm mt-1">{c.message}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <button
+              onClick={() => navigate(`/preview/${shareCode}?token=${token}`)}
+              className="w-full mt-4 py-2.5 bg-indigo-500 text-white rounded-xl font-medium hover:bg-indigo-600 transition cursor-pointer"
+            >
+              📖 책 미리보기
+            </button>
+          </>
         )}
       </div>
 
