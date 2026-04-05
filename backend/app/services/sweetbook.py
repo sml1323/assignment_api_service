@@ -15,12 +15,12 @@ if SDK_PATH not in sys.path:
 
 from bookprintapi import Client, ApiError
 
-# Template UIDs for PHOTOBOOK_A4_SC
-BOOK_SPEC = "PHOTOBOOK_A4_SC"
-COVER_TEMPLATE = "75HruEK3EnG5"          # 표지 (알림장A)
-CONTENT_PHOTO_TEMPLATE = "5ADDkCtrodEJ"  # 내지_photo (구글포토북C) — dayLabel + photo
-CONTENT_TEXT_TEMPLATE = "3mjKd8kcaVzT"   # 내지b (일기장A) — monthNum + dayNum + diaryText
-BLANK_TEMPLATE = "5NxuQPBMyuTm"          # 빈내지 (구글포토북C)
+# Template UIDs for PHOTOBOOK_A5_SC (수첩 크기)
+BOOK_SPEC = "PHOTOBOOK_A5_SC"
+COVER_TEMPLATE = "40nimglmWLSh"          # 표지 A5 (알림장A)
+CONTENT_PHOTO_TEMPLATE = "1XtN1225R7wN"  # 내지_photo A5 (구글포토북C) — dayLabel + photo
+CONTENT_TEXT_TEMPLATE = "6fWlpfO42nV3"   # 내지b A5 (일기장A) — monthNum + dayNum + diaryText
+BLANK_TEMPLATE = "64CsbRzJ605v"          # 빈내지 A5 (구글포토북C)
 MIN_PAGES = 24
 
 
