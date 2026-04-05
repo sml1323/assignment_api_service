@@ -66,37 +66,12 @@ def create_book(share_code: str, token: str = Query(...), db: Session = Depends(
         raise HTTPException(status_code=400, detail="이미 책이 생성되었습니다.")
 
     try:
-        book_uid = sweetbook.create_book(event.title)
-
-        # Upload photos and insert content pages
-        from ..services.image import get_upload_path
-        for contrib in event.contributions:
-            if contrib.image_filename:
-                photo_path = str(get_upload_path(contrib.image_filename))
-                sweetbook.upload_photo(book_uid, photo_path)
-                sweetbook.insert_content(
-                    book_uid,
-                    template_uid="CONTENT_TEMPLATE_UID",
-                    parameters={
-                        "photo": contrib.image_filename,
-                        "text": f"{contrib.contributor_name}: {contrib.message}",
-                    },
-                )
-            else:
-                sweetbook.insert_content(
-                    book_uid,
-                    template_uid="CONTENT_TEMPLATE_UID",
-                    parameters={
-                        "text": f"{contrib.contributor_name}: {contrib.message}",
-                    },
-                )
-
-        sweetbook.finalize_book(book_uid)
-        event.sweetbook_book_uid = book_uid
+        result = sweetbook.build_celebration_book(event, event.contributions)
+        event.sweetbook_book_uid = result["book_uid"]
         event.status = "reviewing"
         db.commit()
 
-        return {"success": True, "book_uid": book_uid}
+        return {"success": True, "book_uid": result["book_uid"], "page_count": result["page_count"]}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"책 생성 중 오류가 발생했습니다: {str(e)}")
