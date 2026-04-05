@@ -13,7 +13,8 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
 
-  // Order form
+  // Confirm & Order
+  const [showConfirm, setShowConfirm] = useState(false);
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [orderForm, setOrderForm] = useState({
     recipient_name: '',
@@ -152,14 +153,57 @@ export default function Dashboard() {
 
         {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
 
-        {event.status === 'collecting' && (
+        {event.status === 'collecting' && !showConfirm && (
           <button
-            onClick={handleCreateBook}
-            disabled={actionLoading === 'book' || contributions.length === 0}
+            onClick={() => setShowConfirm(true)}
+            disabled={contributions.length === 0}
             className="w-full py-3 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition disabled:opacity-50 cursor-pointer"
           >
-            {actionLoading === 'book' ? '책 생성 중...' : `📖 축하책 만들기 (${contributions.length}개 메시지)`}
+            {`📖 축하책 만들기 (${contributions.length}개 메시지)`}
           </button>
+        )}
+
+        {event.status === 'collecting' && showConfirm && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <h3 className="font-bold text-gray-800 mb-2">📋 책에 들어갈 내용을 확인해주세요</h3>
+              <p className="text-sm text-gray-500 mb-3">
+                확정 후에는 메시지를 추가하거나 수정할 수 없습니다.
+              </p>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {contributions.map((c, i) => (
+                  <div key={c.id} className="bg-white rounded-lg p-3 flex items-start gap-3">
+                    <span className="text-xs text-gray-400 font-mono mt-1">{i + 1}p</span>
+                    {c.image_url && (
+                      <img src={c.image_url} alt="" className="w-12 h-12 object-cover rounded shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{c.contributor_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{c.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                총 {contributions.length}명의 메시지 + 빈 페이지로 24페이지 구성
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-300 transition cursor-pointer"
+              >
+                돌아가기
+              </button>
+              <button
+                onClick={() => { setShowConfirm(false); handleCreateBook(); }}
+                disabled={actionLoading === 'book'}
+                className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition disabled:opacity-50 cursor-pointer"
+              >
+                {actionLoading === 'book' ? '생성 중...' : '확정하고 책 만들기'}
+              </button>
+            </div>
+          </div>
         )}
 
         {event.status === 'reviewing' && !showOrderForm && (
