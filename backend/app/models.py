@@ -1,11 +1,11 @@
-"""SQLAlchemy models — Event + Contribution only"""
+"""SQLAlchemy models — Trip, Page, Zone, Message"""
 
 import uuid
 import secrets
 import string
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -15,39 +15,74 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
-def generate_share_code():
+def generate_token():
     chars = string.ascii_lowercase + string.digits
-    return "".join(secrets.choice(chars) for _ in range(8))
+    return "".join(secrets.choice(chars) for _ in range(12))
 
 
-class Event(Base):
-    __tablename__ = "events"
+class Trip(Base):
+    """여행 — 포토북의 최상위 단위"""
+    __tablename__ = "trips"
 
     id = Column(String, primary_key=True, default=generate_uuid)
     title = Column(String(200), nullable=False)
-    event_type = Column(String(20), nullable=False)  # graduation, retirement, birthday, wedding, other
-    recipient_name = Column(String(100), nullable=False)
-    organizer_name = Column(String(100), nullable=False)
-    share_code = Column(String(8), unique=True, nullable=False, default=generate_share_code)
-    admin_token = Column(String, nullable=False, default=generate_uuid)
-    status = Column(String(20), nullable=False, default="collecting")
-    # Sweetbook API IDs (stored directly, no separate Book/Order models)
+    destination = Column(String(200), nullable=False)
+    start_date = Column(String(10), nullable=True)  # YYYY-MM-DD
+    end_date = Column(String(10), nullable=True)
+    cover_image = Column(String, nullable=True)  # 표지 사진 파일명
+    admin_token = Column(String, unique=True, nullable=False, default=generate_token)
+    share_token = Column(String, unique=True, nullable=False, default=generate_token)
+    status = Column(String(20), nullable=False, default="draft")
+    # draft → collecting → finalized → ordered
     sweetbook_book_uid = Column(String, nullable=True)
     sweetbook_order_uid = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    contributions = relationship("Contribution", back_populates="event", order_by="Contribution.page_order")
+    pages = relationship("Page", back_populates="trip", order_by="Page.page_number")
 
 
-class Contribution(Base):
-    __tablename__ = "contributions"
+class Page(Base):
+    """페이지 — 여행 사진 1장 = 1페이지"""
+    __tablename__ = "pages"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    event_id = Column(String, ForeignKey("events.id"), nullable=False)
-    contributor_name = Column(String(100), nullable=False)
-    message = Column(Text, nullable=False)
-    image_filename = Column(String, nullable=True)
-    page_order = Column(Integer, nullable=False, default=0)
+    trip_id = Column(String, ForeignKey("trips.id"), nullable=False)
+    page_number = Column(Integer, nullable=False)
+    photo_url = Column(String, nullable=False)  # backend/uploads/ 상대경로
+    caption = Column(String(200), nullable=True)  # 주최자 캡션
+    subtitle = Column(String(100), nullable=True)  # AI 생성 소제목
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    event = relationship("Event", back_populates="contributions")
+    trip = relationship("Trip", back_populates="pages")
+    zones = relationship("Zone", back_populates="page", order_by="Zone.zone_number")
+
+
+class Zone(Base):
+    """존 — 페이지 내 기여 영역 (4-6개/페이지)"""
+    __tablename__ = "zones"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    page_id = Column(String, ForeignKey("pages.id"), nullable=False)
+    zone_number = Column(Integer, nullable=False)  # 1-6
+    claimed_by = Column(String(100), nullable=True)
+    claimed_at = Column(DateTime, nullable=True)
+    max_length = Column(Integer, nullable=False, default=100)
+
+    page = relationship("Page", back_populates="zones")
+    message = relationship("Message", back_populates="zone", uselist=False)
+
+
+class Message(Base):
+    """메시지 — 참여자의 텍스트 기여"""
+    __tablename__ = "messages"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    zone_id = Column(String, ForeignKey("zones.id"), nullable=False)
+    author_name = Column(String(100), nullable=False)
+    content = Column(Text, nullable=False)
+    color = Column(String(7), nullable=False, default="#FFFFFF")  # hex color
+    position_x = Column(Integer, nullable=False, default=50)  # 0-100 percent
+    position_y = Column(Integer, nullable=False, default=50)  # 0-100 percent
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    zone = relationship("Zone", back_populates="message")
