@@ -28,6 +28,9 @@
 ### Docker (권장)
 
 ```bash
+git clone https://github.com/sml1323/assignment_api_service.git
+cd assignment_api_service
+
 cp .env.example .env
 # .env 파일에 BOOKPRINT_API_KEY 입력
 
