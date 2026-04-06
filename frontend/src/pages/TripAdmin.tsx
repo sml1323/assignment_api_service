@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { getTrip, getPages, uploadPagesBulk, updateTripStatus, finalizeBook, reorderPages } from '../lib/api';
-import type { Trip, Page } from '../lib/api';
+import { getTrip, getPages, uploadPagesBulk, updateTripStatus, finalizeBook, reorderPages, getAuditLog, getOrderStatus } from '../lib/api';
+import type { Trip, Page, AuditEntry } from '../lib/api';
 
 export default function TripAdmin() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -20,6 +20,8 @@ export default function TripAdmin() {
   const [tab, setTab] = useState<'pages' | 'status' | 'order'>('pages');
   const [copied, setCopied] = useState(false);
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [orderDetail, setOrderDetail] = useState<any>(null);
 
   useEffect(() => {
     if (adminToken && tripId) {
@@ -37,6 +39,18 @@ export default function TripAdmin() {
       ]);
       setTrip(t);
       setPages(p);
+      // Load audit log
+      try {
+        const audit = await getAuditLog(tripId, adminToken);
+        setAuditLog(audit);
+      } catch {}
+      // Load order detail if ordered
+      if (t.status === 'ordered' && t.sweetbook_order_uid) {
+        try {
+          const od = await getOrderStatus(tripId, adminToken);
+          setOrderDetail(od);
+        } catch {}
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -378,7 +392,20 @@ export default function TripAdmin() {
               <div className="text-center space-y-4">
                 <p className="text-6xl">✅</p>
                 <h2 className="text-lg font-medium text-gray-800">포토북이 확정되었습니다</h2>
-                <p className="text-sm text-gray-500">Book UID: {trip.sweetbook_book_uid}</p>
+                <div className="bg-white rounded-xl p-4 shadow-sm text-left space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Book UID</span>
+                    <span className="text-gray-700 font-mono text-xs">{trip.sweetbook_book_uid}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">사양</span>
+                    <span className="text-gray-700">A4 소프트커버 포토북</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">페이지 수</span>
+                    <span className="text-gray-700">{trip.page_count}p (최소 24p)</span>
+                  </div>
+                </div>
                 <button
                   onClick={() => navigate(`/trip/${tripId}/order?token=${adminToken}`)}
                   className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-medium transition-colors"
@@ -387,14 +414,87 @@ export default function TripAdmin() {
                 </button>
               </div>
             ) : trip.status === 'ordered' ? (
-              <div className="text-center space-y-4">
-                <p className="text-6xl">📦</p>
-                <h2 className="text-lg font-medium text-gray-800">주문이 완료되었습니다</h2>
-                <p className="text-sm text-gray-500">Order UID: {trip.sweetbook_order_uid}</p>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-4xl mb-2">📦</p>
+                  <h2 className="text-lg font-medium text-gray-800">주문 완료</h2>
+                  <p className="text-xs text-gray-400 font-mono mt-1">{trip.sweetbook_order_uid}</p>
+                </div>
+
+                {/* Order Status Timeline */}
+                <div className="bg-white rounded-xl p-4 shadow-sm">
+                  <p className="text-sm font-medium text-gray-700 mb-3">주문 상태</p>
+                  <div className="space-y-3">
+                    {[
+                      { code: 20, label: '결제 완료', icon: '💳' },
+                      { code: 25, label: 'PDF 생성', icon: '📄' },
+                      { code: 30, label: '제작 확정', icon: '✅' },
+                      { code: 40, label: '인쇄 중', icon: '🖨️' },
+                      { code: 50, label: '인쇄 완료', icon: '📋' },
+                      { code: 60, label: '발송 완료', icon: '🚚' },
+                      { code: 70, label: '배송 완료', icon: '🎉' },
+                    ].map((step, i) => {
+                      const currentCode = orderDetail?.orderStatus || 20;
+                      const isDone = step.code <= currentCode;
+                      const isCurrent = step.code === currentCode;
+                      return (
+                        <div key={step.code} className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
+                            isDone ? 'bg-green-100' : 'bg-gray-100'
+                          } ${isCurrent ? 'ring-2 ring-green-400' : ''}`}>
+                            {isDone ? step.icon : <span className="text-gray-300">{i + 1}</span>}
+                          </div>
+                          <span className={`text-sm ${isDone ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
+                            {step.label}
+                          </span>
+                          {isCurrent && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">현재</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Order Summary */}
+                {orderDetail && (
+                  <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
+                    <p className="text-sm font-medium text-gray-700">주문 정보</p>
+                    {orderDetail.orderStatusDisplay && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">상태</span>
+                        <span className="text-gray-700">{orderDetail.orderStatusDisplay}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8">
                 <p className="text-gray-400">포토북 확정 후 주문할 수 있습니다</p>
+              </div>
+            )}
+
+            {/* Audit Log Timeline */}
+            {auditLog.length > 0 && (
+              <div className="bg-white rounded-xl p-4 shadow-sm">
+                <p className="text-sm font-medium text-gray-700 mb-3">활동 로그</p>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {auditLog.slice(0, 20).map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-2 text-xs">
+                      <span className="text-gray-300 flex-shrink-0 w-14">
+                        {new Date(entry.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] flex-shrink-0 ${
+                        entry.action.startsWith('webhook') ? 'bg-purple-50 text-purple-600' :
+                        entry.action.startsWith('order') ? 'bg-blue-50 text-blue-600' :
+                        entry.action.startsWith('book') ? 'bg-green-50 text-green-600' :
+                        'bg-gray-50 text-gray-500'
+                      }`}>
+                        {entry.action}
+                      </span>
+                      <span className="text-gray-500">{entry.actor}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

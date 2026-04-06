@@ -23,6 +23,17 @@ const POSITION_PRESETS = [
   { x: 25, y: 85, label: '좌하' },
 ];
 
+function timeAgo(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '방금 전';
+  if (min < 60) return `${min}분 전`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}시간 전`;
+  return `${Math.floor(hr / 24)}일 전`;
+}
+
 export default function Contribute() {
   const { tripId } = useParams<{ tripId: string }>();
   const navigate = useNavigate();
@@ -256,6 +267,11 @@ export default function Contribute() {
                 >
                   — {zone.message!.author_name}
                 </p>
+                {zone.message!.updated_at && (
+                  <p className="text-[9px] mt-0.5" style={{ color: zone.message!.color, opacity: 0.5, textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                    {timeAgo(zone.message!.updated_at)}
+                  </p>
+                )}
               </div>
             ))}
 
@@ -300,6 +316,9 @@ export default function Contribute() {
                   >
                     <p className="text-gray-700 text-sm leading-relaxed">{zone.message.content}</p>
                     <p className="text-gray-400 text-xs mt-2 text-right">— {zone.message.author_name}</p>
+                    {zone.message.updated_at && (
+                      <p className="text-gray-300 text-[10px]">{timeAgo(zone.message.updated_at)}</p>
+                    )}
                   </div>
                 ) : (
                   <button

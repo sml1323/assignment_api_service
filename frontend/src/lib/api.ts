@@ -43,6 +43,7 @@ export interface Message {
   color: string;
   position_x: number;
   position_y: number;
+  updated_at: string | null;
   created_at: string;
 }
 
@@ -202,6 +203,28 @@ export async function deleteMessage(
 ): Promise<void> {
   const res = await fetch(`${BASE}/api/messages/${messageId}`, {
     method: 'DELETE',
+    headers: adminHeaders(adminToken),
+  });
+  return handleResponse(res);
+}
+
+// --- Audit ---
+
+export interface AuditEntry {
+  id: string;
+  trip_id: string | null;
+  action: string;
+  actor: string;
+  target: string | null;
+  detail: string | null;
+  created_at: string;
+}
+
+export async function getAuditLog(
+  tripId: string,
+  adminToken: string,
+): Promise<AuditEntry[]> {
+  const res = await fetch(`${BASE}/api/trips/${tripId}/audit`, {
     headers: adminHeaders(adminToken),
   });
   return handleResponse(res);
