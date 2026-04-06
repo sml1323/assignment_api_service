@@ -2,13 +2,17 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Trip, Page, Zone, Message
-from ..schemas import OrderCreate
-from ..services.sweetbook import build_tripbook, estimate_order, create_order, get_order
+from ..schemas import OrderCreate, OrderCancelRequest, ShippingUpdate
+from ..services.sweetbook import (
+    build_tripbook, estimate_order, create_order, get_order,
+    cancel_order, update_order_shipping,
+)
+from bookprintapi import ApiError
 from ..services.image import compose_photo_with_text, UPLOAD_DIR
 from ..services.audit import log_action
 from ..services.kakao import notify_book_finalized, notify_order_created
@@ -115,6 +119,29 @@ def finalize_book(
     }
 
 
+@router.get("/{trip_id}/estimate")
+def get_estimate(
+    trip_id: str,
+    quantity: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+    x_admin_token: str = Header(...),
+):
+    """견적 조회 (주문 전 가격 확인)"""
+    trip = require_admin(trip_id, db, x_admin_token)
+
+    if trip.status not in ("finalized", "ordered"):
+        raise HTTPException(422, "finalized 또는 ordered 상태에서만 견적을 조회할 수 있습니다")
+
+    if not trip.sweetbook_book_uid:
+        raise HTTPException(422, "포토북이 아직 생성되지 않았습니다")
+
+    try:
+        result = estimate_order(trip.sweetbook_book_uid, quantity)
+        return result.get("data", result)
+    except ApiError as e:
+        raise HTTPException(e.status_code or 500, detail=str(e))
+
+
 @router.post("/{trip_id}/order")
 def place_order(
     trip_id: str,
@@ -136,7 +163,14 @@ def place_order(
 
     # Create order
     shipping = body.shipping.model_dump()
-    result = create_order(trip.sweetbook_book_uid, shipping, body.quantity)
+    try:
+        result = create_order(trip.sweetbook_book_uid, shipping, body.quantity)
+    except ApiError as e:
+        if e.status_code == 402:
+            raise HTTPException(402, detail="충전금이 부족합니다. 충전 후 다시 시도해주세요.")
+        elif e.status_code == 400:
+            raise HTTPException(400, detail=e.details if e.details else str(e))
+        raise HTTPException(500, detail="주문 처리 중 오류가 발생했습니다")
 
     trip.sweetbook_order_uid = result["data"]["orderUid"]
     trip.status = "ordered"
@@ -174,3 +208,71 @@ def get_order_status(
 
     result = get_order(trip.sweetbook_order_uid)
     return result.get("data", {})
+
+
+@router.post("/{trip_id}/order/cancel")
+def cancel_trip_order(
+    trip_id: str,
+    body: OrderCancelRequest,
+    db: Session = Depends(get_db),
+    x_admin_token: str = Header(...),
+):
+    """주문 취소 (PAID/PDF_READY 상태만)"""
+    trip = require_admin(trip_id, db, x_admin_token)
+
+    if not trip.sweetbook_order_uid:
+        raise HTTPException(404, "주문 정보가 없습니다")
+
+    # 현재 주문 상태 확인
+    order_detail = get_order(trip.sweetbook_order_uid)
+    order_status = order_detail.get("data", {}).get("orderStatus", 0)
+
+    if order_status not in (20, 25):  # PAID, PDF_READY
+        raise HTTPException(409, "현재 상태에서는 취소할 수 없습니다 (결제완료/PDF준비 상태만 취소 가능)")
+
+    try:
+        cancel_order(trip.sweetbook_order_uid, body.reason)
+    except ApiError as e:
+        raise HTTPException(e.status_code or 500, detail=str(e))
+
+    trip.status = "finalized"
+    trip.sweetbook_order_uid = None
+    log_action(db, "order.cancel", "admin", trip_id=trip.id, detail={"reason": body.reason})
+    db.commit()
+
+    return {"status": "cancelled", "trip_status": "finalized"}
+
+
+@router.put("/{trip_id}/order/shipping")
+def update_trip_shipping(
+    trip_id: str,
+    body: ShippingUpdate,
+    db: Session = Depends(get_db),
+    x_admin_token: str = Header(...),
+):
+    """배송지 변경 (발송 전만 가능)"""
+    trip = require_admin(trip_id, db, x_admin_token)
+
+    if not trip.sweetbook_order_uid:
+        raise HTTPException(404, "주문 정보가 없습니다")
+
+    # 현재 주문 상태 확인
+    order_detail = get_order(trip.sweetbook_order_uid)
+    order_status = order_detail.get("data", {}).get("orderStatus", 0)
+
+    if order_status >= 40:  # IN_PRODUCTION 이상
+        raise HTTPException(409, "발송 후에는 배송지를 변경할 수 없습니다")
+
+    fields = body.model_dump(exclude_none=True)
+    if not fields:
+        raise HTTPException(422, "변경할 항목이 없습니다")
+
+    try:
+        result = update_order_shipping(trip.sweetbook_order_uid, fields)
+    except ApiError as e:
+        raise HTTPException(e.status_code or 500, detail=str(e))
+
+    log_action(db, "order.shipping_update", "admin", trip_id=trip.id, detail=fields)
+    db.commit()
+
+    return {"status": "updated", "fields": list(fields.keys())}
