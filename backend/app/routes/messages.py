@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Trip, Page, Zone, Message
 from ..schemas import MessageCreate, MessageUpdate, MessageResponse
+from ..services.audit import log_action
 
 router = APIRouter(prefix="/api", tags=["messages"])
 
@@ -34,7 +35,16 @@ def claim_and_write(
         raise HTTPException(422, "현재 메시지를 작성할 수 없는 상태입니다")
 
     if zone.claimed_by is not None:
-        raise HTTPException(409, f"이미 {zone.claimed_by}님이 선점한 존입니다")
+        has_msg = zone.message is not None
+        if not has_msg and zone.claimed_at:
+            elapsed = (datetime.now(timezone.utc) - zone.claimed_at).total_seconds()
+            if elapsed > 600:  # 10 min timeout
+                zone.claimed_by = None
+                zone.claimed_at = None
+            else:
+                raise HTTPException(409, f"이미 {zone.claimed_by}님이 선점한 존입니다")
+        else:
+            raise HTTPException(409, f"이미 {zone.claimed_by}님이 선점한 존입니다")
 
     if len(body.content) > zone.max_length:
         raise HTTPException(422, f"메시지가 최대 길이({zone.max_length}자)를 초과합니다")
@@ -52,6 +62,7 @@ def claim_and_write(
         position_y=body.position_y,
     )
     db.add(message)
+    log_action(db, "message.write", body.author_name, trip_id=trip.id, target=zone.id, detail={"content": body.content[:50]})
     db.commit()
     db.refresh(message)
     return message
@@ -87,6 +98,8 @@ def update_message(
     if body.position_y is not None:
         message.position_y = body.position_y
 
+    message.updated_at = datetime.now(timezone.utc)
+    log_action(db, "message.update", message.author_name, trip_id=trip.id, target=message.id)
     db.commit()
     db.refresh(message)
     return message
@@ -114,6 +127,7 @@ def delete_message(
     zone.claimed_by = None
     zone.claimed_at = None
 
+    log_action(db, "message.delete", "admin", trip_id=trip.id, target=message.id, detail={"author": message.author_name})
     db.delete(message)
     db.commit()
     return {"ok": True}

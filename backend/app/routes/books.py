@@ -10,6 +10,7 @@ from ..models import Trip, Page, Zone, Message
 from ..schemas import OrderCreate
 from ..services.sweetbook import build_tripbook, estimate_order, create_order, get_order
 from ..services.image import compose_photo_with_text, UPLOAD_DIR
+from ..services.audit import log_action
 
 router = APIRouter(prefix="/api/trips", tags=["books"])
 
@@ -92,6 +93,7 @@ def finalize_book(
 
     trip.sweetbook_book_uid = result["book_uid"]
     trip.status = "finalized"
+    log_action(db, "book.finalize", "admin", trip_id=trip.id, target=result["book_uid"], detail={"page_count": result["page_count"]})
     db.commit()
 
     return {
@@ -126,6 +128,7 @@ def place_order(
 
     trip.sweetbook_order_uid = result["data"]["orderUid"]
     trip.status = "ordered"
+    log_action(db, "order.create", "admin", trip_id=trip.id, target=result["data"]["orderUid"])
     db.commit()
 
     return {

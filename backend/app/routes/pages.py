@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Trip, Page, Zone
 from ..schemas import PageResponse
+from ..services.audit import log_action
 
 router = APIRouter(prefix="/api", tags=["pages"])
 
@@ -69,6 +70,7 @@ def add_page(
         zone = Zone(page_id=page.id, zone_number=zone_num)
         db.add(zone)
 
+    log_action(db, "page.upload", "admin", trip_id=trip_id, target=page.id)
     db.commit()
     db.refresh(page)
     return page
@@ -157,6 +159,7 @@ def reorder_pages(
         if pid in page_map:
             page_map[pid].page_number = i + 1
 
+    log_action(db, "page.reorder", "admin", trip_id=trip_id, detail={"order": page_ids})
     db.commit()
     return {"ok": True, "order": page_ids}
 

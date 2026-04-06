@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Trip, Zone
 from ..schemas import TripCreate, TripAdminResponse, TripShareResponse, StatusUpdate
+from ..services.audit import log_action
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
 
@@ -65,6 +66,8 @@ def create_trip(body: TripCreate, db: Session = Depends(get_db)):
         end_date=body.end_date,
     )
     db.add(trip)
+    db.flush()
+    log_action(db, "trip.create", "admin", trip_id=trip.id, detail={"title": trip.title, "destination": trip.destination})
     db.commit()
     db.refresh(trip)
     return build_trip_response(trip, db, include_admin=True)
@@ -102,6 +105,8 @@ def update_status(
             422,
             f"'{trip.status}' → '{body.status}' 전환은 허용되지 않습니다. 가능: {allowed}",
         )
+    old_status = trip.status
     trip.status = body.status
+    log_action(db, "trip.status_change", "admin", trip_id=trip.id, detail={"from": old_status, "to": body.status})
     db.commit()
     return {"status": trip.status}
