@@ -48,8 +48,8 @@ docker compose up --build
 
 ```bash
 # 저장소 클론
-git clone https://github.com/sml1323/celebook.git
-cd celebook
+git clone https://github.com/sml1323/assignment_api_service.git
+cd assignment_api_service
 
 # 백엔드 설치
 pip install -r backend/requirements.txt
