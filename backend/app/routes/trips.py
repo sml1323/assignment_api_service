@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Trip, Zone
-from ..schemas import TripCreate, TripAdminResponse, TripShareResponse, StatusUpdate
+from ..models import Trip, Zone, AuditLog
+from ..schemas import TripCreate, TripAdminResponse, TripShareResponse, StatusUpdate, AuditLogResponse
 from ..services.audit import log_action
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
@@ -110,3 +110,15 @@ def update_status(
     log_action(db, "trip.status_change", "admin", trip_id=trip.id, detail={"from": old_status, "to": body.status})
     db.commit()
     return {"status": trip.status}
+
+
+@router.get("/{trip_id}/audit", response_model=list[AuditLogResponse])
+def get_audit_log(
+    trip_id: str,
+    db: Session = Depends(get_db),
+    x_admin_token: str = Header(...),
+):
+    """관리자용 감사 로그 타임라인"""
+    trip = get_trip_with_auth(trip_id, db, x_admin_token)
+    logs = db.query(AuditLog).filter(AuditLog.trip_id == trip_id).order_by(AuditLog.created_at.desc()).limit(100).all()
+    return logs
