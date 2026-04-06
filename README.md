@@ -1,4 +1,4 @@
-# TripBook — 여행 포토북 협업 서비스
+# CeleBook — 여행 포토북 협업 서비스
 
 여행 다녀온 후, 함께 간 사람들이 같이 만드는 포토북 서비스입니다.
 
@@ -10,12 +10,16 @@
 
 ### 주요 기능
 
+- **회원 시스템** — 간단한 가입/로그인, 내 여행 목록 관리
 - **사진 일괄 업로드** — 여행 사진을 한 번에 올리면 자동으로 페이지 구성
-- **공유 링크로 협업** — 링크를 보내면 참여자가 각 페이지에 텍스트 추억을 남김
+- **공유 링크로 협업** — 링크를 보내면 참여자가 각 페이지에 텍스트 추억을 남김 (비회원 가능)
 - **사진 위 텍스트 배치** — 드래그로 위치 이동, 8가지 색상 프리셋 선택
 - **미리보기** — react-pageflip 기반 페이지 넘기기 애니메이션
 - **포토북 인쇄 주문** — Book Print API 연동으로 실물 책 주문 (A4 소프트커버)
-- **존 기반 선점** — 참여자별 영역 선점으로 충돌 방지
+- **주문 관리** — 견적 조회, 주문 생성, 취소, 배송지 변경
+- **충전금 관리** — 잔액 조회, Sandbox 테스트 충전, 거래 내역
+- **카카오톡 알림** — 포토북 확정/주문 시 카카오톡 알림 (선택)
+- **Webhook 연동** — 주문 상태 변경 실시간 수신 + HMAC 서명 검증
 
 ---
 
@@ -31,23 +35,24 @@
 
 ```bash
 # 저장소 클론
-git clone https://github.com/sml1323/assignment_api_service.git
-cd assignment_api_service
+git clone https://github.com/sml1323/celebook.git
+cd celebook
 
 # 백엔드 설치
 pip install -r backend/requirements.txt
+pip install -e bookprintapi-python-sdk
 
 # 프론트엔드 설치
 cd frontend && npm install && cd ..
 
 # 환경변수 설정
 cp .env.example .env
-# .env 파일에 API Key 입력
+# .env 파일에 BOOKPRINT_API_KEY 입력 (Sandbox Key)
 
 # 프론트엔드 빌드
 cd frontend && npm run build && cd ..
 
-# 더미 데이터 생성 (제주도 3박4일 시나리오)
+# 더미 데이터 생성 (데모 계정 + 제주도 3박4일 시나리오)
 python -m backend.app.seed
 
 # 서버 실행
@@ -56,7 +61,61 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 브라우저에서 `http://localhost:8000` 접속
 
-> 시드 실행 후 콘솔에 주최자 대시보드 URL과 참여자 링크가 출력됩니다.
+### 데모 계정
+
+시드 실행 후 아래 계정으로 바로 로그인할 수 있습니다:
+
+| 아이디 | 비밀번호 |
+|-------|---------|
+| demo | demo1234 |
+
+> 로그인하면 "내 여행" 목록에 제주도 3박4일 더미 데이터가 표시됩니다.
+> 시드 실행 시 콘솔에 주최자 대시보드 URL과 참여자 링크도 출력됩니다.
+
+### 카카오톡 알림 (선택)
+
+카카오 알림 기능을 사용하려면 카카오 개발자 앱 설정이 필요합니다.
+`.env`에 `KAKAO_REST_API_KEY`를 입력하면 활성화됩니다.
+없어도 모든 핵심 기능은 정상 동작합니다.
+
+---
+
+## 사용한 API 목록
+
+### Book Print API
+
+| API | 용도 |
+|-----|------|
+| `POST /books` | 새 포토북 생성 (PHOTOBOOK_A4_SC) |
+| `POST /books/{bookUid}/photos` | 사진 업로드 (원본 + Pillow 합성 이미지) |
+| `POST /books/{bookUid}/cover` | 표지 생성 (구글포토북C 테마) |
+| `POST /books/{bookUid}/contents` | 내지 페이지 삽입 (photo, monthHeader, text) |
+| `POST /books/{bookUid}/finalization` | 포토북 확정 (인쇄 준비 완료) |
+| `POST /orders` | 주문 생성 (배송 정보 + 충전금 차감) |
+| `POST /orders/estimate` | 가격 견적 조회 (VAT 포함) |
+| `GET /orders/{orderUid}` | 주문 상태 확인 |
+| `POST /orders/{orderUid}/cancel` | 주문 취소 (PAID/PDF_READY 상태) |
+| `PATCH /orders/{orderUid}/shipping` | 배송지 변경 (발송 전) |
+| `GET /credits` | 충전금 잔액 조회 |
+| `GET /credits/transactions` | 충전금 거래 내역 |
+| `POST /credits/sandbox/charge` | Sandbox 테스트 충전 |
+
+### Webhook 이벤트
+
+| 이벤트 | 처리 |
+|-------|------|
+| `order.status_changed` | 주문 상태 업데이트 + AuditLog 기록 |
+| `order.shipped` | 배송 정보 업데이트 + 카카오 알림 |
+
+### 사용한 템플릿
+
+| 템플릿 UID | 이름 | 용도 |
+|-----------|------|------|
+| `7CO28K1SttwL` | 표지 (구글포토북C) | 표지 — coverPhoto + subtitle + dateRange |
+| `50f9kmXxelPG` | 내지_monthHeader | 섹션 구분 페이지 ("APRIL 2026") |
+| `5ADDkCtrodEJ` | 내지_photo | 사진 페이지 — Pillow 합성 이미지 + dayLabel |
+| `3mjKd8kcaVzT` | 내지b | 텍스트 페이지 — 참여자 하단 존 메시지 |
+| `5NxuQPBMyuTm` | 빈내지 | 최소 24페이지 충족용 패딩 |
 
 ---
 
@@ -88,15 +147,31 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
                                  │ (책 확정)     │
                                  └──────┬───────┘
                                         │
+                                 ┌──────▼───────┐    ┌──────────────┐
+                                 │ estimate     │───→│ 가격 확인      │
+                                 │ (견적)       │    │ + 잔액 확인    │
+                                 └──────┬───────┘    └──────────────┘
+                                        │
                                  ┌──────▼───────┐
-                                 │ orders       │
-                                 │ .create      │
+                                 │ orders       │  → 자동 충전 (잔액 부족 시)
+                                 │ .create      │  → 충전금 즉시 차감
                                  └──────┬───────┘
                                         │
   ┌──────────┐                   ┌──────▼───────┐
   │ DB 업데이트│←──── Webhook ←───│ 상태 변경 알림 │
   │ AuditLog │    (서명 검증)     │ (PAID→SHIPPED)│
-  └──────────┘    (idempotency)  └──────────────┘
+  │ 카카오알림 │    (idempotency)  └──────────────┘
+  └──────────┘
+```
+
+### 주문 상태 흐름
+
+```
+PAID(20) → PDF_READY(25) → CONFIRMED(30) → IN_PRODUCTION(40)
+→ PRODUCTION_COMPLETE(50) → SHIPPED(60) → DELIVERED(70)
+
+※ Sandbox 환경에서는 PAID 상태에서 멈춥니다 (실제 제작/배송 없음)
+※ 파트너 취소: PAID/PDF_READY 상태에서만 가능 → CANCELLED_REFUND(81)
 ```
 
 ### Webhook 연동
@@ -108,36 +183,8 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 ### Audit Log
 
-- 모든 주요 액션을 `audit_logs` 테이블에 기록 (trip 생성, 사진 업로드, 메시지 작성, finalize, 주문, webhook 수신)
+- 모든 주요 액션을 `audit_logs` 테이블에 기록
 - `GET /api/trips/:id/audit` — 관리자용 활동 타임라인 조회
-
----
-
-## 사용한 API 목록
-
-| API | 용도 |
-|-----|------|
-| `POST /books` | 새 포토북 생성 (PHOTOBOOK_A4_SC) |
-| `POST /books/{bookUid}/photos` | 사진 업로드 (원본 + Pillow 합성 이미지) |
-| `POST /books/{bookUid}/cover` | 표지 생성 (구글포토북C 테마) |
-| `POST /books/{bookUid}/contents` | 내지 페이지 삽입 (내지_photo, 내지_monthHeader, 내지b) |
-| `POST /books/{bookUid}/finalization` | 포토북 확정 (인쇄 준비 완료) |
-| `GET /templates` | 사용 가능한 템플릿 목록 조회 |
-| `GET /templates/{templateUid}` | 템플릿 상세 (파라미터 구조 확인) |
-| `GET /book-specs` | 책 사양 조회 (크기, 페이지 범위) |
-| `POST /orders` | 주문 생성 (배송 정보 포함) |
-| `POST /orders/estimate` | 가격 견적 조회 |
-| `GET /orders/{orderUid}` | 주문 상태 확인 |
-
-### 사용한 템플릿
-
-| 템플릿 UID | 이름 | 용도 |
-|-----------|------|------|
-| `7CO28K1SttwL` | 표지 (구글포토북C) | 표지 — coverPhoto + subtitle + dateRange |
-| `50f9kmXxelPG` | 내지_monthHeader | 섹션 구분 페이지 ("APRIL 2026") |
-| `5ADDkCtrodEJ` | 내지_photo | 사진 페이지 — Pillow 합성 이미지 + dayLabel |
-| `3mjKd8kcaVzT` | 내지b | 텍스트 페이지 — 참여자 하단 존 메시지 |
-| `5NxuQPBMyuTm` | 빈내지 | 최소 24페이지 충족용 패딩 |
 
 ---
 
@@ -145,10 +192,10 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 | AI 도구 | 활용 내용 |
 |--------|---------|
-| Claude Code (Opus) | 전체 프로젝트 설계, 백엔드/프론트엔드 구현, API 연동, 코드 리뷰 |
-| Claude Code — /office-hours | 서비스 기획 (여행 포토북 협업 컨셉 도출, 디자인 문서 작성) |
-| Claude Code — /plan-eng-review | 아키텍처 리뷰 (템플릿 선택, 존 모델, Pillow 합성 전략) |
-| Codex (OpenAI) | 독립적 second opinion (UI 구조, MVP 스코프 검증) |
+| Claude Code (Opus 4.6) | 전체 프로젝트 설계, 백엔드/프론트엔드 구현, API 연동 |
+| Claude Code — Superpowers (brainstorming, writing-plans, subagent-driven) | 기능 설계 → 구현 계획 → 병렬 에이전트 실행 워크플로우 |
+| Claude Code — gstack (/browse, /qa) | 헤드리스 브라우저 QA 테스트, E2E 플로우 검증 |
+| Claude Code — Codex | 독립적 second opinion (UI 구조, MVP 스코프 검증) |
 
 ---
 
@@ -157,9 +204,11 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 | 영역 | 기술 |
 |------|------|
 | 프론트엔드 | React 19, TypeScript, Tailwind CSS 4, react-pageflip |
-| 백엔드 | FastAPI, SQLAlchemy, SQLite (WAL mode) |
+| 백엔드 | FastAPI, SQLAlchemy, SQLite (WAL mode), Pydantic |
+| 인증 | bcrypt + random token (JWT-free) |
 | 이미지 처리 | Pillow (사진 위 텍스트 합성 → 인쇄용 이미지 생성) |
 | API 연동 | Book Print API Python SDK (Sandbox) |
+| 알림 | 카카오톡 메시지 API (선택) |
 
 ---
 
@@ -169,7 +218,7 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 과제 예시의 "여행 포토북"에서 한 단계 더 나갔습니다. 단순히 사진을 올려서 책을 만드는 서비스가 아니라, **함께 여행한 사람들이 각자의 추억을 남겨 공동으로 포토북을 완성하는 협업 경험**을 설계했습니다.
 
-스위트북의 Book Print API 관점에서 보면, 이 서비스는 API를 "인쇄 벤더"가 아닌 **"소셜 크리에이션 인프라"**로 포지셔닝합니다. 1인이 혼자 만드는 포토북보다, 여러 명이 함께 만드는 포토북이 주문 전환율과 재방문율이 높을 것으로 예상합니다.
+스위트북의 Book Print API 관점에서 보면, 이 서비스는 API를 "인쇄 벤더"가 아닌 **"소셜 크리에이션 인프라"**로 포지셔닝합니다.
 
 ### 비즈니스 가능성
 
@@ -195,32 +244,44 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 │   ├── app/
 │   │   ├── main.py              # FastAPI 앱 + CORS + 정적 파일 서빙
 │   │   ├── database.py          # SQLite + WAL mode
-│   │   ├── models.py            # Trip, Page, Zone, Message
+│   │   ├── models.py            # User, Trip, Page, Zone, Message, WebhookLog, AuditLog
 │   │   ├── schemas.py           # Pydantic 요청/응답 스키마
-│   │   ├── seed.py              # 더미 데이터 (제주도 3박4일)
+│   │   ├── seed.py              # 더미 데이터 (데모 계정 + 제주도 3박4일)
 │   │   ├── routes/
+│   │   │   ├── auth.py          # 회원가입/로그인 + 카카오 OAuth
 │   │   │   ├── trips.py         # 여행 CRUD + 상태 전환
-│   │   │   ├── pages.py         # 사진 업로드 + 존 자동 생성 + 순서 변경
+│   │   │   ├── pages.py         # 사진 업로드 + 존 자동 생성
 │   │   │   ├── messages.py      # 존 선점 + 메시지 작성/수정/삭제
-│   │   │   └── books.py         # Sweetbook API 연동 (finalize + order)
+│   │   │   ├── books.py         # Sweetbook API (finalize + order + cancel + shipping)
+│   │   │   ├── credits.py       # 충전금 잔액/거래내역/Sandbox 충전
+│   │   │   └── webhooks.py      # Webhook 수신 + 서명 검증
 │   │   └── services/
-│   │       ├── sweetbook.py     # Book Print API 통신 (구글포토북 테마)
-│   │       └── image.py         # Pillow 이미지 합성 + 리사이즈
-│   ├── requirements.txt
-│   └── uploads/                 # 업로드된 사진 (gitignore)
+│   │       ├── sweetbook.py     # Book Print API 통신
+│   │       ├── image.py         # Pillow 이미지 합성
+│   │       ├── audit.py         # 감사 로그 기록
+│   │       └── kakao.py         # 카카오톡 알림
+│   └── requirements.txt
 ├── frontend/
 │   └── src/
 │       ├── App.tsx              # 라우팅
 │       ├── lib/api.ts           # API 클라이언트
-│       └── pages/
-│           ├── Landing.tsx      # 랜딩 페이지
-│           ├── CreateTrip.tsx   # 여행 생성
-│           ├── TripAdmin.tsx    # 주최자 대시보드
-│           ├── JoinTrip.tsx     # 참여자 진입
-│           ├── Contribute.tsx   # 메시지 작성 (드래그, 색상, 수정)
-│           ├── BookPreview.tsx  # 포토북 미리보기
-│           └── OrderPage.tsx    # 주문 (배송 정보)
+│       ├── pages/
+│       │   ├── Landing.tsx      # 랜딩 (로그인 시 내 여행 목록)
+│       │   ├── LoginPage.tsx    # 로그인/회원가입
+│       │   ├── CreateTrip.tsx   # 여행 생성
+│       │   ├── TripAdmin.tsx    # 주최자 대시보드 (페이지/현황/주문/충전금)
+│       │   ├── JoinTrip.tsx     # 참여자 진입 (비회원)
+│       │   ├── Contribute.tsx   # 메시지 작성 (드래그, 색상)
+│       │   ├── BookPreview.tsx  # 포토북 미리보기
+│       │   └── OrderPage.tsx    # 주문 (견적/배송/결제/취소/변경)
+│       └── components/order/
+│           ├── EstimateSection.tsx
+│           ├── ShippingForm.tsx
+│           ├── CreditBalance.tsx
+│           ├── OrderTimeline.tsx
+│           └── OrderActions.tsx
 ├── bookprintapi-python-sdk/     # Book Print API Python SDK
+├── dummy-data/images/           # 더미 여행 사진 (제주도)
 ├── .env.example                 # 환경변수 템플릿
 └── README.md
 ```
