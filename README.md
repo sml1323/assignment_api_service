@@ -60,6 +60,59 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
 ---
 
+## API 연동 플로우
+
+```
+주최자 플로우                              Sweetbook API
+─────────────                            ──────────────
+                                         
+ ┌──────────┐    ┌──────────┐    ┌──────────────┐
+ │ 사진 업로드 │───→│ Pillow   │───→│ photos       │
+ │ (일괄)    │    │ 텍스트합성 │    │ .upload      │
+ └──────────┘    └──────────┘    └──────┬───────┘
+                                        │
+                                 ┌──────▼───────┐
+                                 │ covers       │
+                                 │ .create      │
+                                 │ (구글포토북C)  │
+                                 └──────┬───────┘
+                                        │
+                                 ┌──────▼───────┐
+                                 │ contents     │  ← monthHeader
+                                 │ .insert      │  ← 내지_photo (합성 이미지)
+                                 │ (반복)       │  ← 내지b (텍스트)
+                                 └──────┬───────┘
+                                        │
+                                 ┌──────▼───────┐
+                                 │ finalize     │
+                                 │ (책 확정)     │
+                                 └──────┬───────┘
+                                        │
+                                 ┌──────▼───────┐
+                                 │ orders       │
+                                 │ .create      │
+                                 └──────┬───────┘
+                                        │
+  ┌──────────┐                   ┌──────▼───────┐
+  │ DB 업데이트│←──── Webhook ←───│ 상태 변경 알림 │
+  │ AuditLog │    (서명 검증)     │ (PAID→SHIPPED)│
+  └──────────┘    (idempotency)  └──────────────┘
+```
+
+### Webhook 연동
+
+- `POST /api/webhooks/sweetbook` — 주문 상태 변경을 실시간 수신
+- HMAC-SHA256 서명 검증 (X-Webhook-Signature + X-Webhook-Timestamp)
+- event_id 기반 idempotency (중복 호출 자동 무시)
+- 처리 실패 시 DLQ 패턴 (WebhookLog에 error_message + retry_count 기록)
+
+### Audit Log
+
+- 모든 주요 액션을 `audit_logs` 테이블에 기록 (trip 생성, 사진 업로드, 메시지 작성, finalize, 주문, webhook 수신)
+- `GET /api/trips/:id/audit` — 관리자용 활동 타임라인 조회
+
+---
+
 ## 사용한 API 목록
 
 | API | 용도 |
