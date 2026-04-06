@@ -47,6 +47,30 @@ export interface Message {
   created_at: string;
 }
 
+export interface EstimateItem {
+  bookUid: string;
+  title: string;
+  pageCount: number;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface EstimateResponse {
+  items: EstimateItem[];
+  productAmount: number;
+  shippingFee: number;
+  totalAmount: number;
+  paidCreditAmount: number;
+  creditBalance: number;
+  creditSufficient: boolean;
+}
+
+export interface CreditBalance {
+  balance: number;
+  currency: string;
+  env: string;
+}
+
 // --- Helper ---
 
 function adminHeaders(token: string) {
@@ -272,6 +296,57 @@ export async function getOrderStatus(
 ): Promise<any> {
   const res = await fetch(`${BASE}/api/trips/${tripId}/order`, {
     headers: adminHeaders(adminToken),
+  });
+  return handleResponse(res);
+}
+
+export async function getEstimate(
+  tripId: string,
+  adminToken: string,
+  quantity: number = 1,
+): Promise<EstimateResponse> {
+  const res = await fetch(`${BASE}/api/trips/${tripId}/estimate?quantity=${quantity}`, {
+    headers: adminHeaders(adminToken),
+  });
+  return handleResponse(res);
+}
+
+export async function getCreditBalance(adminToken: string): Promise<CreditBalance> {
+  const res = await fetch(`${BASE}/api/credits/balance`, {
+    headers: adminHeaders(adminToken),
+  });
+  return handleResponse(res);
+}
+
+export async function cancelOrder(
+  tripId: string,
+  adminToken: string,
+  reason: string,
+): Promise<{ status: string; trip_status: string }> {
+  const res = await fetch(`${BASE}/api/trips/${tripId}/order/cancel`, {
+    method: 'POST',
+    headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  return handleResponse(res);
+}
+
+export async function updateShipping(
+  tripId: string,
+  adminToken: string,
+  shipping: Partial<{
+    recipientName: string;
+    recipientPhone: string;
+    postalCode: string;
+    address1: string;
+    address2: string;
+    memo: string;
+  }>,
+): Promise<{ status: string; fields: string[] }> {
+  const res = await fetch(`${BASE}/api/trips/${tripId}/order/shipping`, {
+    method: 'PUT',
+    headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify(shipping),
   });
   return handleResponse(res);
 }
