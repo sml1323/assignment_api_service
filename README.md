@@ -25,7 +25,20 @@
 
 ## 실행 방법
 
-### 요구사항
+### Docker (권장)
+
+```bash
+cp .env.example .env
+# .env 파일에 BOOKPRINT_API_KEY 입력
+
+docker compose up --build
+```
+
+브라우저에서 `http://localhost:8000` 접속. 더미 데이터 자동 생성됨.
+
+### 로컬 실행
+
+#### 요구사항
 
 - Python 3.10+
 - Node.js 18+

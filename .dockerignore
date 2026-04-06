@@ -1,0 +1,13 @@
+node_modules
+frontend/node_modules
+frontend/dist
+__pycache__
+*.pyc
+.env
+tripbook.db*
+backend/uploads/*
+.git
+.claude
+docs/superpowers
+*.md
+!README.md
