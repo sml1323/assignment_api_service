@@ -13,11 +13,12 @@ import requests
 
 logger = logging.getLogger("tripbook.kakao")
 
-KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
-KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
-KAKAO_REDIRECT_URI = os.getenv("KAKAO_REDIRECT_URI", "http://localhost:8000/api/auth/kakao/callback")
+def _env(key: str, default: str = "") -> str:
+    """런타임에 환경변수 읽기 (.env 로드 타이밍 이슈 방지)."""
+    return os.getenv(key, default)
 
-TRIPBOOK_URL = os.getenv("TRIPBOOK_URL", "http://localhost:8000")
+
+KAKAO_REDIRECT_URI_DEFAULT = "http://localhost:8000/api/auth/kakao/callback"
 
 STATUS_EMOJI = {
     "finalized": "📖",
@@ -36,8 +37,8 @@ STATUS_EMOJI = {
 def get_login_url(trip_id: str, admin_token: str) -> str:
     """카카오 로그인 URL 생성. state에 trip_id+admin_token을 넣어서 콜백에서 복원."""
     params = {
-        "client_id": KAKAO_REST_API_KEY,
-        "redirect_uri": KAKAO_REDIRECT_URI,
+        "client_id": _env("KAKAO_REST_API_KEY"),
+        "redirect_uri": _env("KAKAO_REDIRECT_URI", KAKAO_REDIRECT_URI_DEFAULT),
         "response_type": "code",
         "scope": "talk_message",
         "state": f"{trip_id}:{admin_token}",
@@ -49,12 +50,13 @@ def exchange_code_for_token(code: str) -> dict | None:
     """인가 코드 → access_token + refresh_token 교환."""
     data = {
         "grant_type": "authorization_code",
-        "client_id": KAKAO_REST_API_KEY,
-        "redirect_uri": KAKAO_REDIRECT_URI,
+        "client_id": _env("KAKAO_REST_API_KEY"),
+        "redirect_uri": _env("KAKAO_REDIRECT_URI", KAKAO_REDIRECT_URI_DEFAULT),
         "code": code,
     }
-    if KAKAO_CLIENT_SECRET:
-        data["client_secret"] = KAKAO_CLIENT_SECRET
+    secret = _env("KAKAO_CLIENT_SECRET")
+    if secret:
+        data["client_secret"] = secret
 
     try:
         resp = requests.post("https://kauth.kakao.com/oauth/token", data=data, timeout=10)
@@ -69,11 +71,12 @@ def refresh_access_token(refresh_token: str) -> dict | None:
     """refresh_token으로 access_token 갱신."""
     data = {
         "grant_type": "refresh_token",
-        "client_id": KAKAO_REST_API_KEY,
+        "client_id": _env("KAKAO_REST_API_KEY"),
         "refresh_token": refresh_token,
     }
-    if KAKAO_CLIENT_SECRET:
-        data["client_secret"] = KAKAO_CLIENT_SECRET
+    secret = _env("KAKAO_CLIENT_SECRET")
+    if secret:
+        data["client_secret"] = secret
 
     try:
         resp = requests.post("https://kauth.kakao.com/oauth/token", data=data, timeout=10)
@@ -94,8 +97,8 @@ def _send_memo(access_token: str, text: str, link_url: str = "") -> bool | None:
         "object_type": "text",
         "text": text[:200],
         "link": {
-            "web_url": link_url or TRIPBOOK_URL,
-            "mobile_web_url": link_url or TRIPBOOK_URL,
+            "web_url": link_url or _env("TRIPBOOK_URL", "http://localhost:8000"),
+            "mobile_web_url": link_url or _env("TRIPBOOK_URL", "http://localhost:8000"),
         },
         "button_title": "TripBook 열기",
     }
@@ -142,7 +145,7 @@ def notify_book_finalized(trip_title: str, trip_id: str, page_count: int,
                           access_token: str = "", refresh_token: str = "") -> tuple[bool, str, str]:
     emoji = STATUS_EMOJI.get("finalized", "📖")
     text = f"{emoji} 포토북 확정!\n\n{trip_title}\n{page_count}페이지 · A4 소프트커버\n주문 준비 완료"
-    link = f"{TRIPBOOK_URL}/trip/{trip_id}/admin"
+    link = f"{_env('TRIPBOOK_URL', 'http://localhost:8000')}/trip/{trip_id}/admin"
     return send_with_refresh(access_token, refresh_token, text, link)
 
 
@@ -150,7 +153,7 @@ def notify_order_created(trip_title: str, trip_id: str, order_uid: str,
                          access_token: str = "", refresh_token: str = "") -> tuple[bool, str, str]:
     emoji = STATUS_EMOJI.get("ordered", "📦")
     text = f"{emoji} 주문 완료!\n\n{trip_title}\n주문번호: {order_uid}\n인쇄 준비 중"
-    link = f"{TRIPBOOK_URL}/trip/{trip_id}/admin"
+    link = f"{_env('TRIPBOOK_URL', 'http://localhost:8000')}/trip/{trip_id}/admin"
     return send_with_refresh(access_token, refresh_token, text, link)
 
 
@@ -159,5 +162,5 @@ def notify_order_status(trip_title: str, trip_id: str, status: str, status_displ
     emoji = STATUS_EMOJI.get(status, "📋")
     display = status_display or status
     text = f"{emoji} 주문 상태 변경\n\n{trip_title}\n상태: {display}"
-    link = f"{TRIPBOOK_URL}/trip/{trip_id}/admin"
+    link = f"{_env('TRIPBOOK_URL', 'http://localhost:8000')}/trip/{trip_id}/admin"
     return send_with_refresh(access_token, refresh_token, text, link)
