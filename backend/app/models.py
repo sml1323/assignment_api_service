@@ -84,5 +84,34 @@ class Message(Base):
     position_x = Column(Integer, nullable=False, default=50)  # 0-100 percent
     position_y = Column(Integer, nullable=False, default=50)  # 0-100 percent
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=True)
 
     zone = relationship("Zone", back_populates="message")
+
+
+class WebhookLog(Base):
+    """Webhook 수신 로그 — idempotency + DLQ"""
+    __tablename__ = "webhook_logs"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    event_id = Column(String, unique=True, nullable=False)
+    event_type = Column(String(50), nullable=False)
+    payload = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="received")
+    error_message = Column(Text, nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    processed_at = Column(DateTime, nullable=True)
+
+
+class AuditLog(Base):
+    """감사 로그 — 주요 액션 추적"""
+    __tablename__ = "audit_logs"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    trip_id = Column(String, ForeignKey("trips.id"), nullable=True)
+    action = Column(String(50), nullable=False)
+    actor = Column(String(100), nullable=False)
+    target = Column(String(200), nullable=True)
+    detail = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

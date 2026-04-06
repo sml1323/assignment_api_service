@@ -100,6 +100,21 @@ class MessageResponse(BaseModel):
     position_x: int
     position_y: int
     created_at: datetime
+    updated_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# --- Audit ---
+
+class AuditLogResponse(BaseModel):
+    id: str
+    trip_id: str | None
+    action: str
+    actor: str
+    target: str | None
+    detail: str | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
