@@ -11,6 +11,7 @@ from ..schemas import OrderCreate
 from ..services.sweetbook import build_tripbook, estimate_order, create_order, get_order
 from ..services.image import compose_photo_with_text, UPLOAD_DIR
 from ..services.audit import log_action
+from ..services.kakao import notify_book_finalized, notify_order_created
 
 router = APIRouter(prefix="/api/trips", tags=["books"])
 
@@ -96,6 +97,8 @@ def finalize_book(
     log_action(db, "book.finalize", "admin", trip_id=trip.id, target=result["book_uid"], detail={"page_count": result["page_count"]})
     db.commit()
 
+    notify_book_finalized(trip.title, trip.id, result["page_count"])
+
     return {
         "book_uid": result["book_uid"],
         "page_count": result["page_count"],
@@ -130,6 +133,8 @@ def place_order(
     trip.status = "ordered"
     log_action(db, "order.create", "admin", trip_id=trip.id, target=result["data"]["orderUid"])
     db.commit()
+
+    notify_order_created(trip.title, trip.id, result["data"]["orderUid"])
 
     return {
         "order_uid": result["data"]["orderUid"],
