@@ -10,7 +10,7 @@ from ..models import Trip, Page, Zone, Message
 from ..schemas import OrderCreate, OrderCancelRequest, ShippingUpdate
 from ..services.sweetbook import (
     build_tripbook, estimate_order, create_order, get_order,
-    cancel_order, update_order_shipping,
+    cancel_order, update_order_shipping, get_client,
 )
 from bookprintapi import ApiError
 from ..services.image import compose_photo_with_text, UPLOAD_DIR
@@ -161,16 +161,24 @@ def place_order(
     # Estimate first
     estimate = estimate_order(trip.sweetbook_book_uid, body.quantity)
 
-    # Create order
+    # Create order (Sandbox: 충전금 부족 시 자동 충전 후 재시도)
     shipping = body.shipping.model_dump()
     try:
         result = create_order(trip.sweetbook_book_uid, shipping, body.quantity)
     except ApiError as e:
         if e.status_code == 402:
-            raise HTTPException(402, detail="충전금이 부족합니다. 충전 후 다시 시도해주세요.")
+            # Sandbox 자동 충전: 필요 금액 + 여유분 충전 후 재시도
+            try:
+                needed = estimate.get("data", {}).get("paidCreditAmount", 100000)
+                client = get_client()
+                client.credits.sandbox_charge(needed + 50000, memo="자동 충전 (잔액 부족)")
+                result = create_order(trip.sweetbook_book_uid, shipping, body.quantity)
+            except ApiError:
+                raise HTTPException(402, detail="충전금이 부족합니다. 충전 후 다시 시도해주세요.")
         elif e.status_code == 400:
             raise HTTPException(400, detail=e.details if e.details else str(e))
-        raise HTTPException(500, detail="주문 처리 중 오류가 발생했습니다")
+        else:
+            raise HTTPException(500, detail="주문 처리 중 오류가 발생했습니다")
 
     trip.sweetbook_order_uid = result["data"]["orderUid"]
     trip.status = "ordered"

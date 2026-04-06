@@ -27,12 +27,14 @@ from backend.app.models import Trip, Page, Zone, Message
 from backend.app.services.image import UPLOAD_DIR
 
 
+DUMMY_IMAGE_DIR = project_root / "dummy-data" / "images"
+
 JEJU_PHOTOS = [
-    {"subtitle": "Day 1 — 제주공항 도착", "caption": "드디어 제주도!", "color": "#45B7D1"},
-    {"subtitle": "Day 1 — 한라산 등반", "caption": "한라산 백록담", "color": "#96CEB4"},
-    {"subtitle": "Day 2 — 성산일출봉", "caption": "일출의 감동", "color": "#FF6B6B"},
-    {"subtitle": "Day 2 — 섭지코지", "caption": "바다와 바람", "color": "#4ECDC4"},
-    {"subtitle": "Day 3 — 우도", "caption": "에메랄드빛 바다", "color": "#FFEAA7"},
+    {"subtitle": "Day 1 — 제주공항 도착", "caption": "드디어 제주도!", "color": "#45B7D1", "image": "IMG_1564.JPG"},
+    {"subtitle": "Day 1 — 한라산 등반", "caption": "한라산 백록담", "color": "#96CEB4", "image": "IMG_1567.jpg"},
+    {"subtitle": "Day 2 — 성산일출봉", "caption": "일출의 감동", "color": "#FF6B6B", "image": "IMG_1568.jpg"},
+    {"subtitle": "Day 2 — 섭지코지", "caption": "바다와 바람", "color": "#4ECDC4", "image": "IMG_1569.jpg"},
+    {"subtitle": "Day 3 — 우도", "caption": "에메랄드빛 바다", "color": "#FFEAA7", "image": "IMG_1570.jpg"},
     {"subtitle": "Day 3 — 흑돼지 맛집", "caption": "제주 흑돼지!", "color": "#DDA0DD"},
     {"subtitle": "Day 4 — 카페 투어", "caption": "감성 카페", "color": "#F7DC6F"},
     {"subtitle": "Day 4 — 공항 귀환", "caption": "또 오자, 제주!", "color": "#85C1E9"},
@@ -121,11 +123,18 @@ def seed():
         for i, photo_data in enumerate(JEJU_PHOTOS):
             filename = f"page_{i+1}_jeju.jpg"
             filepath = trip_dir / filename
-            generate_dummy_photo(
-                str(filepath),
-                photo_data["caption"],
-                photo_data["color"],
-            )
+
+            # 실제 더미 이미지가 있으면 복사, 없으면 생성
+            real_image = DUMMY_IMAGE_DIR / photo_data.get("image", "") if photo_data.get("image") else None
+            if real_image and real_image.exists():
+                import shutil
+                shutil.copy2(str(real_image), str(filepath))
+            else:
+                generate_dummy_photo(
+                    str(filepath),
+                    photo_data["caption"],
+                    photo_data["color"],
+                )
 
             page = Page(
                 trip_id=trip.id,
