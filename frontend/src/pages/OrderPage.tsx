@@ -41,19 +41,20 @@ export default function OrderPage() {
       setTrip(t);
 
       if (t.status === 'finalized') {
-        const [est, bal] = await Promise.all([
+        const results = await Promise.allSettled([
           getEstimate(tripId, adminToken),
           getCreditBalance(adminToken),
         ]);
-        setEstimate(est);
-        setBalance(bal);
+        if (results[0].status === 'fulfilled') setEstimate(results[0].value);
+        else setError(results[0].reason?.message || '견적 조회 실패');
+        if (results[1].status === 'fulfilled') setBalance(results[1].value);
       } else if (t.status === 'ordered') {
-        const [od, bal] = await Promise.all([
+        const results = await Promise.allSettled([
           getOrderStatus(tripId, adminToken),
           getCreditBalance(adminToken),
         ]);
-        setOrderDetail(od);
-        setBalance(bal);
+        if (results[0].status === 'fulfilled') setOrderDetail(results[0].value);
+        if (results[1].status === 'fulfilled') setBalance(results[1].value);
       }
     } catch (err: any) {
       setError(err.message);
