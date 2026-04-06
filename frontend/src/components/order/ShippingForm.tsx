@@ -29,7 +29,7 @@ export default function ShippingForm({ initial, onSubmit, submitLabel, loading, 
 
   const isValid = form.recipientName && form.recipientPhone && form.postalCode && form.address1;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (isValid) onSubmit(form);
   };
