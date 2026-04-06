@@ -36,6 +36,8 @@ class Trip(Base):
     # draft → collecting → finalized → ordered
     sweetbook_book_uid = Column(String, nullable=True)
     sweetbook_order_uid = Column(String, nullable=True)
+    kakao_access_token = Column(String, nullable=True)
+    kakao_refresh_token = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     pages = relationship("Page", back_populates="trip", order_by="Page.page_number")

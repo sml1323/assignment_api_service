@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .database import engine, Base
-from .routes import trips, pages, messages, books, webhooks
+from .routes import trips, pages, messages, books, webhooks, auth
 
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
@@ -34,6 +34,7 @@ app.include_router(pages.router)
 app.include_router(messages.router)
 app.include_router(books.router)
 app.include_router(webhooks.router)
+app.include_router(auth.router)
 
 
 @app.get("/api/health")
