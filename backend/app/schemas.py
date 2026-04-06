@@ -133,3 +133,48 @@ class ShippingInfo(BaseModel):
 class OrderCreate(BaseModel):
     shipping: ShippingInfo
     quantity: int = 1
+
+
+# --- Estimate ---
+
+class EstimateItem(BaseModel):
+    bookUid: str
+    title: str
+    pageCount: int
+    quantity: int
+    unitPrice: int
+
+
+class EstimateResponse(BaseModel):
+    items: list[EstimateItem]
+    productAmount: int
+    shippingFee: int
+    totalAmount: int
+    paidCreditAmount: int
+    creditBalance: int
+    creditSufficient: bool
+
+
+# --- Credits ---
+
+class CreditBalanceResponse(BaseModel):
+    balance: int
+    currency: str
+    env: str
+
+
+# --- Order Cancel ---
+
+class OrderCancelRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+# --- Shipping Update ---
+
+class ShippingUpdate(BaseModel):
+    recipientName: str | None = None
+    recipientPhone: str | None = None
+    postalCode: str | None = None
+    address1: str | None = None
+    address2: str | None = None
+    memo: str | None = None

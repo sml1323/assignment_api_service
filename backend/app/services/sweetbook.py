@@ -179,3 +179,37 @@ def create_order(book_uid: str, shipping: dict, quantity: int = 1) -> dict:
 def get_order(order_uid: str) -> dict:
     client = get_client()
     return client.orders.get(order_uid)
+
+
+def cancel_order(order_uid: str, reason: str) -> dict:
+    client = get_client()
+    return client.orders.cancel(order_uid, reason)
+
+
+def update_order_shipping(order_uid: str, fields: dict) -> dict:
+    """배송지 변경. fields는 camelCase dict (ShippingUpdate.model_dump(exclude_none=True))"""
+    client = get_client()
+    # SDK는 snake_case kwargs → camelCase 변환을 내부 처리
+    key_map = {
+        "recipientName": "recipient_name",
+        "recipientPhone": "recipient_phone",
+        "postalCode": "postal_code",
+        "address1": "address1",
+        "address2": "address2",
+        "memo": "shipping_memo",
+    }
+    kwargs = {}
+    for camel, snake in key_map.items():
+        if camel in fields:
+            kwargs[snake] = fields[camel]
+    return client.orders.update_shipping(order_uid, **kwargs)
+
+
+def get_balance() -> dict:
+    client = get_client()
+    return client.credits.get_balance()
+
+
+def get_transactions(limit: int = 20, offset: int = 0) -> dict:
+    client = get_client()
+    return client.credits.get_transactions(limit=limit, offset=offset)
