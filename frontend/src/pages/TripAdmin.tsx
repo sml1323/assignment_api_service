@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { getTrip, getPages, uploadPagesBulk, updateTripStatus, finalizeBook, reorderPages, getAuditLog, getOrderStatus } from '../lib/api';
+import { getTrip, getPages, uploadPagesBulk, updateTripStatus, finalizeBook, reorderPages, getAuditLog, getOrderStatus, getCreditBalance, getCreditTransactions, sandboxCharge } from '../lib/api';
 import type { Trip, Page, AuditEntry } from '../lib/api';
 
 export default function TripAdmin() {
@@ -17,11 +17,16 @@ export default function TripAdmin() {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
-  const [tab, setTab] = useState<'pages' | 'status' | 'order'>('pages');
+  const [tab, setTab] = useState<'pages' | 'status' | 'order' | 'credits'>('pages');
   const [copied, setCopied] = useState(false);
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [orderDetail, setOrderDetail] = useState<any>(null);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [creditEnv, setCreditEnv] = useState('');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [chargeAmount, setChargeAmount] = useState('100000');
+  const [charging, setCharging] = useState(false);
 
   useEffect(() => {
     if (adminToken && tripId) {
@@ -151,7 +156,7 @@ export default function TripAdmin() {
       {/* Tabs */}
       <div className="bg-white border-b">
         <div className="max-w-3xl mx-auto flex">
-          {(['pages', 'status', 'order'] as const).map((t) => (
+          {(['pages', 'status', 'order', 'credits'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -161,7 +166,7 @@ export default function TripAdmin() {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'pages' ? '페이지 관리' : t === 'status' ? '참여 현황' : '주문'}
+              {t === 'pages' ? '페이지 관리' : t === 'status' ? '참여 현황' : t === 'order' ? '주문' : '충전금'}
             </button>
           ))}
         </div>
@@ -513,6 +518,135 @@ export default function TripAdmin() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Credits Tab */}
+        {tab === 'credits' && (
+          <CreditsTab
+            chargeAmount={chargeAmount}
+            setChargeAmount={setChargeAmount}
+            charging={charging}
+            setCharging={setCharging}
+            creditBalance={creditBalance}
+            setCreditBalance={setCreditBalance}
+            creditEnv={creditEnv}
+            setCreditEnv={setCreditEnv}
+            transactions={transactions}
+            setTransactions={setTransactions}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CreditsTab({
+  chargeAmount, setChargeAmount, charging, setCharging,
+  creditBalance, setCreditBalance, creditEnv, setCreditEnv,
+  transactions, setTransactions,
+}: {
+  chargeAmount: string; setChargeAmount: (v: string) => void;
+  charging: boolean; setCharging: (v: boolean) => void;
+  creditBalance: number | null; setCreditBalance: (v: number | null) => void;
+  creditEnv: string; setCreditEnv: (v: string) => void;
+  transactions: any[]; setTransactions: (v: any[]) => void;
+}) {
+  const [error, setError] = useState('');
+  const [chargeSuccess, setChargeSuccess] = useState('');
+
+  const loadCredits = async () => {
+    try {
+      const bal = await getCreditBalance('');
+      setCreditBalance(bal.balance);
+      setCreditEnv(bal.env);
+      const txn = await getCreditTransactions(10);
+      setTransactions(txn.transactions || []);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => { loadCredits(); }, []);
+
+  const handleCharge = async () => {
+    const amount = parseInt(chargeAmount);
+    if (!amount || amount < 1000) return;
+    setCharging(true);
+    setError('');
+    setChargeSuccess('');
+    try {
+      await sandboxCharge(amount, '테스트 충전');
+      setChargeSuccess(`${amount.toLocaleString()}원 충전 완료!`);
+      await loadCredits();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setCharging(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Balance */}
+      <div className="bg-white rounded-xl p-6 shadow-sm">
+        <h2 className="text-sm font-medium text-gray-700 mb-3">충전금 잔액</h2>
+        {creditBalance != null ? (
+          <div>
+            <p className="text-3xl font-bold text-gray-800">{creditBalance.toLocaleString()}원</p>
+            {creditEnv && <p className="text-xs text-gray-400 mt-1">{creditEnv === 'test' ? 'Sandbox' : '운영'} 환경</p>}
+          </div>
+        ) : (
+          <p className="text-gray-400">로딩 중...</p>
+        )}
+      </div>
+
+      {/* Sandbox Charge */}
+      <div className="bg-white rounded-xl p-6 shadow-sm">
+        <h2 className="text-sm font-medium text-gray-700 mb-3">Sandbox 테스트 충전</h2>
+        <div className="flex gap-2">
+          <select
+            value={chargeAmount}
+            onChange={(e) => setChargeAmount(e.target.value)}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          >
+            <option value="10000">10,000원</option>
+            <option value="50000">50,000원</option>
+            <option value="100000">100,000원</option>
+            <option value="500000">500,000원</option>
+          </select>
+          <button
+            onClick={handleCharge}
+            disabled={charging}
+            className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white text-sm rounded-lg transition-colors"
+          >
+            {charging ? '충전 중...' : '충전'}
+          </button>
+        </div>
+        {chargeSuccess && <p className="text-sm text-green-600 mt-2">{chargeSuccess}</p>}
+        {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+      </div>
+
+      {/* Transactions */}
+      <div className="bg-white rounded-xl p-6 shadow-sm">
+        <h2 className="text-sm font-medium text-gray-700 mb-3">거래 내역</h2>
+        {transactions.length === 0 ? (
+          <p className="text-sm text-gray-400">거래 내역이 없습니다</p>
+        ) : (
+          <div className="space-y-2">
+            {transactions.map((tx: any, i: number) => (
+              <div key={tx.transactionId || i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div>
+                  <p className="text-sm text-gray-700">{tx.reasonDisplay || tx.memo || '거래'}</p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(tx.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <span className={`text-sm font-medium ${tx.direction === '+' ? 'text-green-600' : 'text-red-500'}`}>
+                  {tx.direction === '+' ? '+' : ''}{tx.amount?.toLocaleString()}원
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>

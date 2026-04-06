@@ -318,6 +318,26 @@ export async function getCreditBalance(adminToken: string): Promise<CreditBalanc
   return handleResponse(res);
 }
 
+export async function getCreditTransactions(
+  limit: number = 20,
+  offset: number = 0,
+): Promise<any> {
+  const res = await fetch(`${BASE}/api/credits/transactions?limit=${limit}&offset=${offset}`);
+  return handleResponse(res);
+}
+
+export async function sandboxCharge(
+  amount: number,
+  memo?: string,
+): Promise<any> {
+  const res = await fetch(`${BASE}/api/credits/sandbox-charge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, memo }),
+  });
+  return handleResponse(res);
+}
+
 export async function cancelOrder(
   tripId: string,
   adminToken: string,
