@@ -22,8 +22,10 @@ load_dotenv(project_root / ".env")
 
 from PIL import Image, ImageDraw, ImageFont
 
+import bcrypt
+
 from backend.app.database import SessionLocal, engine, Base
-from backend.app.models import Trip, Page, Zone, Message
+from backend.app.models import Trip, Page, Zone, Message, User
 from backend.app.services.image import UPLOAD_DIR
 
 
@@ -97,12 +99,20 @@ def seed():
             print("초기화하려면: rm tripbook.db && python -m backend.app.seed")
             return
 
+        # Create demo user
+        demo_pw = bcrypt.hashpw("demo1234".encode(), bcrypt.gensalt()).decode()
+        user = User(username="demo", password_hash=demo_pw)
+        db.add(user)
+        db.flush()
+        print(f"👤 데모 계정: demo / demo1234")
+
         # Create trip
         trip = Trip(
             title="제주도 3박4일",
             destination="제주도",
             start_date="2026-04-01",
             end_date="2026-04-04",
+            user_id=user.id,
         )
         db.add(trip)
         db.flush()

@@ -71,6 +71,26 @@ export interface CreditBalance {
   env: string;
 }
 
+// --- Auth ---
+
+export interface AuthResponse {
+  user_id: string;
+  username: string;
+  token: string;
+}
+
+export interface MyTrip {
+  id: string;
+  title: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  page_count: number;
+  admin_token: string;
+  sweetbook_book_uid: string | null;
+  sweetbook_order_uid: string | null;
+}
+
 // --- Helper ---
 
 function adminHeaders(token: string) {
@@ -97,9 +117,12 @@ export async function createTrip(data: {
   start_date?: string;
   end_date?: string;
 }): Promise<Trip> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const userToken = localStorage.getItem('user_token');
+  if (userToken) headers['X-User-Token'] = userToken;
   const res = await fetch(`${BASE}/api/trips`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(data),
   });
   return handleResponse(res);
@@ -367,6 +390,34 @@ export async function updateShipping(
     method: 'PUT',
     headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
     body: JSON.stringify(shipping),
+  });
+  return handleResponse(res);
+}
+
+// --- Auth ---
+
+export async function register(username: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${BASE}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  return handleResponse(res);
+}
+
+export async function login(username: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  return handleResponse(res);
+}
+
+export async function getMyTrips(): Promise<MyTrip[]> {
+  const token = localStorage.getItem('user_token') || '';
+  const res = await fetch(`${BASE}/api/auth/my/trips`, {
+    headers: { 'X-User-Token': token },
   });
   return handleResponse(res);
 }

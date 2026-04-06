@@ -20,11 +20,25 @@ def generate_token():
     return "".join(secrets.choice(chars) for _ in range(12))
 
 
+class User(Base):
+    """사용자 — 간단한 username/password 인증"""
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    username = Column(String(50), unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    token = Column(String, unique=True, nullable=False, default=generate_token)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    trips = relationship("Trip", back_populates="owner")
+
+
 class Trip(Base):
     """여행 — 포토북의 최상위 단위"""
     __tablename__ = "trips"
 
     id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
     title = Column(String(200), nullable=False)
     destination = Column(String(200), nullable=False)
     start_date = Column(String(10), nullable=True)  # YYYY-MM-DD
@@ -40,6 +54,7 @@ class Trip(Base):
     kakao_refresh_token = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    owner = relationship("User", back_populates="trips")
     pages = relationship("Page", back_populates="trip", order_by="Page.page_number")
 
 

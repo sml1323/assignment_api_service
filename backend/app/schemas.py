@@ -135,6 +135,19 @@ class OrderCreate(BaseModel):
     quantity: int = 1
 
 
+# --- Auth ---
+
+class AuthRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=50)
+    password: str = Field(..., min_length=4, max_length=100)
+
+
+class AuthResponse(BaseModel):
+    user_id: str
+    username: str
+    token: str
+
+
 # --- Estimate ---
 
 class EstimateItem(BaseModel):

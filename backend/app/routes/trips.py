@@ -1,10 +1,11 @@
 """Trip routes — create, get, share, status transitions"""
 
 from fastapi import APIRouter, Depends, HTTPException, Header
+from typing import Optional
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Trip, Zone, AuditLog
+from ..models import Trip, User, Zone, AuditLog
 from ..schemas import TripCreate, TripAdminResponse, TripShareResponse, StatusUpdate, AuditLogResponse
 from ..services.audit import log_action
 
@@ -58,12 +59,24 @@ def build_trip_response(trip: Trip, db: Session, include_admin: bool = False) ->
 
 
 @router.post("", response_model=TripAdminResponse)
-def create_trip(body: TripCreate, db: Session = Depends(get_db)):
+def create_trip(
+    body: TripCreate,
+    db: Session = Depends(get_db),
+    x_user_token: Optional[str] = Header(None),
+):
+    # 로그인 상태면 user_id 연결
+    user_id = None
+    if x_user_token:
+        user = db.query(User).filter(User.token == x_user_token).first()
+        if user:
+            user_id = user.id
+
     trip = Trip(
         title=body.title,
         destination=body.destination,
         start_date=body.start_date,
         end_date=body.end_date,
+        user_id=user_id,
     )
     db.add(trip)
     db.flush()

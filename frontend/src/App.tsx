@@ -6,6 +6,7 @@ import JoinTrip from './pages/JoinTrip';
 import Contribute from './pages/Contribute';
 import BookPreview from './pages/BookPreview';
 import OrderPage from './pages/OrderPage';
+import LoginPage from './pages/LoginPage';
 import './App.css';
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/create" element={<CreateTrip />} />
           <Route path="/trip/:tripId/admin" element={<TripAdmin />} />
           <Route path="/join/:token" element={<JoinTrip />} />
