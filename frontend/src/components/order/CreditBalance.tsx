@@ -9,9 +9,9 @@ interface Props {
 export default function CreditBalance({ balance, paidAmount, loading }: Props) {
   if (loading) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm animate-pulse">
-        <div className="h-4 bg-gray-200 rounded w-20 mb-3" />
-        <div className="h-6 bg-gray-200 rounded w-32" />
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 animate-pulse">
+        <div className="h-3 bg-gray-100 rounded w-16 mb-3" />
+        <div className="h-5 bg-gray-100 rounded w-28" />
       </div>
     );
   }
@@ -22,19 +22,19 @@ export default function CreditBalance({ balance, paidAmount, loading }: Props) {
   const afterBalance = paidAmount != null ? balance.balance - paidAmount : null;
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm">
-      <h2 className="text-sm font-medium text-gray-700 mb-3">충전금</h2>
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">충전금</p>
 
-      <div className="space-y-2 text-sm">
+      <div className="space-y-2.5 text-sm">
         <div className="flex justify-between">
-          <span className="text-gray-500">현재 잔액</span>
-          <span className="text-gray-700 font-medium">{balance.balance.toLocaleString()}원</span>
+          <span className="text-gray-400">현재 잔액</span>
+          <span className="text-gray-700 font-medium tabular-nums">{balance.balance.toLocaleString()}원</span>
         </div>
 
         {afterBalance != null && (
           <div className="flex justify-between">
-            <span className="text-gray-500">결제 후 잔액</span>
-            <span className={sufficient ? 'text-gray-700' : 'text-red-500 font-medium'}>
+            <span className="text-gray-400">결제 후 잔액</span>
+            <span className={`tabular-nums ${sufficient ? 'text-gray-700' : 'text-red-500 font-medium'}`}>
               {afterBalance.toLocaleString()}원
             </span>
           </div>
@@ -42,15 +42,17 @@ export default function CreditBalance({ balance, paidAmount, loading }: Props) {
       </div>
 
       {!sufficient && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">
+        <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+          <p className="text-sm text-red-500">
             충전금이 부족합니다. 충전 후 다시 시도해주세요.
           </p>
         </div>
       )}
 
       {balance.env === 'sandbox' && (
-        <p className="mt-2 text-xs text-gray-400">Sandbox 환경</p>
+        <span className="inline-block mt-2 px-2 py-0.5 bg-gray-50 text-gray-400 text-[10px] font-medium rounded-full uppercase tracking-wider">
+          Sandbox
+        </span>
       )}
     </div>
   );

@@ -32,28 +32,32 @@ export default function LoginPage() {
     }
   };
 
+  const inputClass = `w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-800
+    placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400
+    transition-all duration-150`;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-sm w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-serif font-bold text-gray-800">CeleBook</h1>
-          <p className="text-gray-500 mt-2">함께 만드는 여행 포토북</p>
+    <div className="min-h-screen flex items-center justify-center px-5">
+      <div className="max-w-sm w-full space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-display font-bold text-gray-800 tracking-tight">CeleBook</h1>
+          <p className="text-sm text-gray-400">함께 만드는 여행 포토북</p>
         </div>
 
         {/* Tab */}
-        <div className="flex mb-6 bg-gray-100 rounded-xl p-1">
+        <div className="flex bg-gray-100 rounded-xl p-1">
           <button
             onClick={() => { setIsRegister(false); setError(''); }}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              !isRegister ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
+            className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+              !isRegister ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             로그인
           </button>
           <button
             onClick={() => { setIsRegister(true); setError(''); }}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              isRegister ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500'
+            className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+              isRegister ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             회원가입
@@ -61,40 +65,38 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">아이디</label>
+          <div className="space-y-3">
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="아이디 입력"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none"
+              placeholder="아이디"
+              className={inputClass}
             />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">비밀번호</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="비밀번호 입력"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none"
+              placeholder="비밀번호"
+              className={inputClass}
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-red-500 px-1">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium rounded-xl transition-colors"
+            className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                       text-white font-semibold rounded-xl transition-all duration-150
+                       disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100"
           >
             {loading ? '처리 중...' : isRegister ? '가입하기' : '로그인'}
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
-          데모 계정: demo / demo1234
+        <p className="text-center text-xs text-gray-400">
+          데모 계정: <span className="text-gray-500 font-medium">demo</span> / <span className="text-gray-500 font-medium">demo1234</span>
         </p>
       </div>
     </div>

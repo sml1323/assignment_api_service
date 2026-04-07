@@ -34,79 +34,45 @@ export default function ShippingForm({ initial, onSubmit, submitLabel, loading, 
     if (isValid) onSubmit(form);
   };
 
-  const inputClass =
-    'w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none';
+  const inputClass = `w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-800
+    placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400
+    transition-all duration-150`;
+
+  const fields: { key: keyof ShippingData; label: string; placeholder: string; required?: boolean; type?: string }[] = [
+    { key: 'recipientName', label: '받는 사람', placeholder: '홍길동', required: true },
+    { key: 'recipientPhone', label: '연락처', placeholder: '010-1234-5678', required: true, type: 'tel' },
+    { key: 'postalCode', label: '우편번호', placeholder: '06100', required: true },
+    { key: 'address1', label: '주소', placeholder: '서울특별시 강남구 테헤란로 123', required: true },
+    { key: 'address2', label: '상세주소', placeholder: '4층' },
+    { key: 'memo', label: '배송 메모', placeholder: '부재 시 경비실' },
+  ];
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl p-6 shadow-sm space-y-4">
-      <h2 className="text-sm font-medium text-gray-700">배송 정보</h2>
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">배송 정보</p>
 
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">받는 사람 *</label>
-        <input
-          type="text"
-          value={form.recipientName}
-          onChange={(e) => setForm({ ...form, recipientName: e.target.value })}
-          placeholder="홍길동"
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">연락처 *</label>
-        <input
-          type="tel"
-          value={form.recipientPhone}
-          onChange={(e) => setForm({ ...form, recipientPhone: e.target.value })}
-          placeholder="010-1234-5678"
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">우편번호 *</label>
-        <input
-          type="text"
-          value={form.postalCode}
-          onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
-          placeholder="06100"
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">주소 *</label>
-        <input
-          type="text"
-          value={form.address1}
-          onChange={(e) => setForm({ ...form, address1: e.target.value })}
-          placeholder="서울특별시 강남구 테헤란로 123"
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">상세주소</label>
-        <input
-          type="text"
-          value={form.address2}
-          onChange={(e) => setForm({ ...form, address2: e.target.value })}
-          placeholder="4층"
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">배송 메모</label>
-        <input
-          type="text"
-          value={form.memo}
-          onChange={(e) => setForm({ ...form, memo: e.target.value })}
-          placeholder="부재 시 경비실"
-          className={inputClass}
-        />
-      </div>
+      {fields.map((f) => (
+        <div key={f.key} className="space-y-1.5">
+          <label className="block text-xs font-medium text-gray-500">
+            {f.label} {f.required && '*'}
+          </label>
+          <input
+            type={'type' in f ? f.type : 'text'}
+            value={form[f.key]}
+            onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+            placeholder={f.placeholder}
+            className={inputClass}
+          />
+        </div>
+      ))}
 
       {submitLabel && (
         <button
           type="submit"
           disabled={!isValid || loading || disabled}
-          className="w-full py-4 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 text-white text-lg font-medium rounded-xl transition-colors"
+          className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                     text-white font-semibold rounded-xl transition-all duration-150
+                     disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100"
         >
           {loading ? '처리 중...' : submitLabel}
         </button>

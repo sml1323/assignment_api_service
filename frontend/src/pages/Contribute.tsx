@@ -45,7 +45,6 @@ export default function Contribute() {
   const shareToken = sessionStorage.getItem('share_token') || '';
   const participantName = sessionStorage.getItem('participant_name') || '';
 
-  // Modal state
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [messageText, setMessageText] = useState('');
@@ -53,8 +52,7 @@ export default function Contribute() {
   const [selectedPos, setSelectedPos] = useState({ x: 75, y: 15 });
   const [submitting, setSubmitting] = useState(false);
 
-  // Drag state
-  const [dragging, setDragging] = useState<string | null>(null); // message id
+  const [dragging, setDragging] = useState<string | null>(null);
   const photoRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = useCallback((msgId: string, e: React.MouseEvent | React.TouchEvent) => {
@@ -70,7 +68,6 @@ export default function Contribute() {
     const x = Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100));
     const y = Math.max(5, Math.min(95, ((clientY - rect.top) / rect.height) * 100));
 
-    // Update local state immediately for smooth visual feedback
     setPages(prev => prev.map(p => ({
       ...p,
       zones: p.zones.map(z => ({
@@ -92,7 +89,7 @@ export default function Contribute() {
           position_x: zone.message.position_x,
           position_y: zone.message.position_y,
         });
-      } catch { /* silent — position already updated locally */ }
+      } catch { /* silent */ }
     }
     setDragging(null);
   }, [dragging, pages, currentPage, shareToken]);
@@ -176,15 +173,19 @@ export default function Contribute() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">페이지 로딩 중...</p></div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   if (!shareToken || !participantName) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">공유 링크를 통해 접속해주세요</p>
-          <button onClick={() => navigate('/')} className="text-orange-500 hover:underline">홈으로</button>
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="text-center space-y-3">
+          <p className="text-sm text-gray-500">공유 링크를 통해 접속해주세요</p>
+          <button onClick={() => navigate('/')} className="text-sm text-orange-500 hover:text-orange-600 transition-colors">홈으로</button>
         </div>
       </div>
     );
@@ -195,25 +196,27 @@ export default function Contribute() {
 
   const isOverlayZone = (z: Zone) => z.zone_number <= 2;
 
+  const inputClass = `w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-800
+    placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400
+    transition-all duration-150 resize-none h-28`;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 px-5 py-3 flex items-center justify-between">
         <span className="text-sm text-gray-500">{participantName}님</span>
-        <span className="text-sm text-gray-400">{currentPage + 1} / {pages.length}</span>
+        <span className="text-xs text-gray-400 tabular-nums">{currentPage + 1} / {pages.length}</span>
       </div>
 
-      <div className="max-w-lg mx-auto p-4">
+      <div className="max-w-lg mx-auto px-5 py-5">
         {page.subtitle && (
-          <div className="text-center mb-3">
-            <p className="text-sm font-medium text-gray-500">{page.subtitle}</p>
-          </div>
+          <p className="text-center text-sm font-medium text-gray-500 mb-3">{page.subtitle}</p>
         )}
 
         {/* Photo + Overlay Zones */}
         <div
           ref={photoRef}
-          className="relative bg-white rounded-2xl overflow-hidden shadow-lg select-none"
+          className="relative bg-white rounded-2xl overflow-hidden border border-gray-100 select-none"
           onMouseMove={handleDragMove}
           onMouseUp={handleDragEnd}
           onMouseLeave={handleDragEnd}
@@ -227,7 +230,7 @@ export default function Contribute() {
             draggable={false}
           />
 
-          {/* Overlay messages on photo (zones 1-2) — draggable */}
+          {/* Overlay messages — draggable */}
           {page.zones
             .filter((z) => isOverlayZone(z) && z.message)
             .map((zone) => (
@@ -275,7 +278,7 @@ export default function Contribute() {
               </div>
             ))}
 
-          {/* Empty overlay zones — click to add */}
+          {/* Empty overlay zones */}
           {page.zones
             .filter((z) => isOverlayZone(z) && !z.message)
             .map((zone) => {
@@ -284,7 +287,8 @@ export default function Contribute() {
                 <button
                   key={zone.id}
                   onClick={() => openNewModal(zone)}
-                  className="absolute bg-white/10 hover:bg-white/30 border border-dashed border-white/50 rounded-lg px-3 py-2 text-white/70 text-xs transition-all cursor-pointer"
+                  className="absolute bg-white/10 hover:bg-white/25 border border-dashed border-white/40
+                             rounded-xl px-3 py-2 text-white/70 text-xs transition-all cursor-pointer"
                   style={{
                     left: `${defaultPos.x}%`,
                     top: `${defaultPos.y}%`,
@@ -297,21 +301,22 @@ export default function Contribute() {
             })}
 
           {page.caption && (
-            <div className="px-4 py-2 bg-gray-50">
-              <p className="text-sm text-gray-600">{page.caption}</p>
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+              <p className="text-sm text-gray-500">{page.caption}</p>
             </div>
           )}
         </div>
 
         {/* Bottom Zones (3-4) */}
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        <div className="grid grid-cols-2 gap-3 mt-4">
           {page.zones
             .filter((z) => !isOverlayZone(z))
             .map((zone) => (
               <div key={zone.id}>
                 {zone.message ? (
                   <div
-                    className="bg-white rounded-xl p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                    className="bg-white rounded-2xl border border-gray-100 p-4 cursor-pointer
+                               hover:shadow-md transition-all duration-200"
                     onClick={() => openEditModal(zone)}
                   >
                     <p className="text-gray-700 text-sm leading-relaxed">{zone.message.content}</p>
@@ -323,9 +328,12 @@ export default function Contribute() {
                 ) : (
                   <button
                     onClick={() => openNewModal(zone)}
-                    className="w-full bg-white hover:bg-orange-50 border-2 border-dashed border-gray-200 hover:border-orange-300 rounded-xl p-4 text-gray-400 text-sm transition-colors cursor-pointer min-h-[100px] flex items-center justify-center"
+                    className="w-full bg-white hover:bg-orange-50 border-2 border-dashed border-gray-200
+                               hover:border-orange-300 rounded-2xl p-4 text-gray-400 text-sm
+                               transition-all duration-200 cursor-pointer min-h-[100px]
+                               flex items-center justify-center"
                   >
-                    ✏️ 추억 남기기
+                    추억 남기기
                   </button>
                 )}
               </div>
@@ -337,51 +345,52 @@ export default function Contribute() {
           <button
             onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
             disabled={currentPage === 0}
-            className="px-4 py-2 text-gray-500 disabled:text-gray-300"
+            className="px-4 py-2 text-gray-500 hover:text-gray-700 disabled:text-gray-300 transition-colors text-sm"
           >
             ← 이전
           </button>
           <button
             onClick={() => setCurrentPage((p) => Math.min(pages.length - 1, p + 1))}
             disabled={currentPage === pages.length - 1}
-            className="px-4 py-2 text-orange-500 disabled:text-gray-300"
+            className="px-4 py-2 text-orange-500 hover:text-orange-600 disabled:text-gray-300 transition-colors text-sm"
           >
             다음 →
           </button>
         </div>
       </div>
 
-      {/* Modal — New or Edit */}
+      {/* Modal */}
       {selectedZone && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-50">
           <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 space-y-4">
-            <h3 className="text-lg font-medium text-gray-800">
-              {editingMessage ? '수정하기' : '추억 남기기'}
-            </h3>
-            <p className="text-sm text-gray-500">
-              {editingMessage ? `${editingMessage.author_name}님의 메시지` : `${participantName}님의 이름으로 작성됩니다`}
-            </p>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800">
+                {editingMessage ? '수정하기' : '추억 남기기'}
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                {editingMessage ? `${editingMessage.author_name}님의 메시지` : `${participantName}님의 이름으로 작성됩니다`}
+              </p>
+            </div>
 
-            {/* Text input */}
             <textarea
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               placeholder="이 순간의 추억을 남겨주세요..."
               maxLength={selectedZone.max_length}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 outline-none resize-none h-28"
+              className={inputClass}
               autoFocus
             />
 
             {/* Color Picker */}
             {isOverlayZone(selectedZone) && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">글자 색상</p>
+                <p className="text-xs font-medium text-gray-400 mb-2">글자 색상</p>
                 <div className="flex gap-2 flex-wrap">
                   {COLOR_PRESETS.map((c) => (
                     <button
                       key={c.hex}
                       onClick={() => setSelectedColor(c.hex)}
-                      className={`w-8 h-8 rounded-full border-2 transition-transform ${
+                      className={`w-8 h-8 rounded-full border-2 transition-all duration-150 ${
                         selectedColor === c.hex ? 'border-orange-500 scale-110' : 'border-gray-200'
                       }`}
                       style={{ backgroundColor: c.hex }}
@@ -392,19 +401,19 @@ export default function Contribute() {
               </div>
             )}
 
-            {/* Position Picker (overlay zones only) */}
+            {/* Position Picker */}
             {isOverlayZone(selectedZone) && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">위치</p>
+                <p className="text-xs font-medium text-gray-400 mb-2">위치</p>
                 <div className="grid grid-cols-3 gap-1.5">
                   {POSITION_PRESETS.map((pos) => (
                     <button
                       key={`${pos.x}-${pos.y}`}
                       onClick={() => setSelectedPos(pos)}
-                      className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      className={`py-1.5 rounded-xl text-xs font-medium transition-all duration-150 ${
                         selectedPos.x === pos.x && selectedPos.y === pos.y
-                          ? 'bg-orange-100 text-orange-700 border border-orange-300'
-                          : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                          ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                          : 'bg-gray-50 text-gray-500 border border-gray-100 hover:bg-gray-100'
                       }`}
                     >
                       {pos.label}
@@ -416,7 +425,7 @@ export default function Contribute() {
 
             {/* Preview */}
             {isOverlayZone(selectedZone) && messageText && (
-              <div className="bg-gray-800 rounded-xl p-4 relative min-h-[60px]">
+              <div className="bg-gray-800 rounded-2xl p-4 relative min-h-[60px]">
                 <p
                   className="text-sm font-medium"
                   style={{
@@ -432,24 +441,29 @@ export default function Contribute() {
               </div>
             )}
 
-            <div className="text-xs text-gray-400">
-              {messageText.length} / {selectedZone.max_length}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400 tabular-nums">
+                {messageText.length} / {selectedZone.max_length}
+              </span>
+              {error && <span className="text-xs text-red-500">{error}</span>}
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
 
             <div className="flex gap-3">
               <button
                 onClick={closeModal}
-                className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl"
+                className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-600
+                           rounded-xl font-medium transition-all duration-150"
               >
                 취소
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={!messageText.trim() || submitting}
-                className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white rounded-xl transition-colors"
+                className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                           disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100
+                           text-white font-medium rounded-xl transition-all duration-150"
               >
-                {submitting ? '처리 중...' : editingMessage ? '수정하기' : '작성하기'}
+                {submitting ? '처리 중...' : editingMessage ? '수정' : '작성'}
               </button>
             </div>
           </div>

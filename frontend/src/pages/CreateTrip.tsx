@@ -13,7 +13,7 @@ export default function CreateTrip() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (!form.title || !form.destination) {
       setError('여행 제목과 목적지를 입력해주세요');
@@ -24,7 +24,6 @@ export default function CreateTrip() {
     setError('');
     try {
       const trip = await createTrip(form);
-      // Store admin token
       localStorage.setItem(`trip_admin_${trip.id}`, trip.admin_token!);
       navigate(`/trip/${trip.id}/admin?token=${trip.admin_token}`);
     } catch (err: any) {
@@ -34,26 +33,31 @@ export default function CreateTrip() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <button
-          onClick={() => navigate('/')}
-          className="mb-6 text-gray-500 hover:text-gray-700 text-sm"
-        >
-          ← 홈으로
-        </button>
+  const inputClass = `w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-800
+    placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400
+    transition-all duration-150`;
 
-        <h1 className="text-3xl font-serif font-bold text-gray-800 mb-2">
-          새 여행 만들기
-        </h1>
-        <p className="text-gray-500 mb-8">
-          여행 정보를 입력하고 포토북을 시작하세요
-        </p>
+  return (
+    <div className="min-h-screen flex items-center justify-center px-5">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <button
+            onClick={() => navigate('/')}
+            className="text-gray-400 hover:text-gray-600 text-sm transition-colors mb-6 block"
+          >
+            ← 홈으로
+          </button>
+          <h1 className="text-3xl font-display font-bold text-gray-800 tracking-tight">
+            새 여행 만들기
+          </h1>
+          <p className="text-sm text-gray-400 mt-2">
+            여행 정보를 입력하고 포토북을 시작하세요
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
               여행 제목 *
             </label>
             <input
@@ -61,12 +65,12 @@ export default function CreateTrip() {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="예: 제주도 3박4일"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none"
+              className={inputClass}
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
               목적지 *
             </label>
             <input
@@ -74,43 +78,43 @@ export default function CreateTrip() {
               value={form.destination}
               onChange={(e) => setForm({ ...form, destination: e.target.value })}
               placeholder="예: 제주도"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none"
+              className={inputClass}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
                 시작일
               </label>
               <input
                 type="date"
                 value={form.start_date}
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none"
+                className={inputClass}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
                 종료일
               </label>
               <input
                 type="date"
                 value={form.end_date}
                 onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none"
+                className={inputClass}
               />
             </div>
           </div>
 
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-500 px-1">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white text-lg font-medium rounded-xl transition-colors"
+            className="w-full py-4 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                       text-white text-base font-semibold rounded-xl transition-all duration-150
+                       disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100"
           >
             {loading ? '생성 중...' : '여행 만들기'}
           </button>

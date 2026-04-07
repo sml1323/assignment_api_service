@@ -34,20 +34,22 @@ export default function JoinTrip() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">로딩 중...</p>
+        <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-6xl mb-4">😢</p>
-          <h2 className="text-xl font-medium text-gray-800 mb-2">
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl">😢</span>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-800">
             {error || '여행을 찾을 수 없습니다'}
           </h2>
-          <p className="text-gray-500">공유 링크가 올바른지 확인해주세요</p>
+          <p className="text-sm text-gray-400">공유 링크가 올바른지 확인해주세요</p>
         </div>
       </div>
     );
@@ -55,13 +57,13 @@ export default function JoinTrip() {
 
   if (trip.status !== 'collecting') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-6xl mb-4">📖</p>
-          <h2 className="text-xl font-medium text-gray-800 mb-2">
-            이 여행은 마감되었습니다
-          </h2>
-          <p className="text-gray-500">
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="text-center space-y-3">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl">📖</span>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-800">마감된 여행</h2>
+          <p className="text-sm text-gray-400">
             {trip.title} 포토북은 이미 확정되었습니다
           </p>
         </div>
@@ -70,14 +72,16 @@ export default function JoinTrip() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="max-w-md w-full text-center space-y-6">
-        <div>
-          <p className="text-6xl mb-4">🏝️</p>
-          <h1 className="text-3xl font-serif font-bold text-gray-800">
+    <div className="min-h-screen flex items-center justify-center px-5">
+      <div className="max-w-sm w-full text-center space-y-6">
+        <div className="space-y-2">
+          <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-4xl">🏝️</span>
+          </div>
+          <h1 className="text-2xl font-display font-bold text-gray-800 tracking-tight">
             {trip.title}
           </h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-sm text-gray-400">
             {trip.destination}
             {trip.start_date && trip.end_date && (
               <span> · {trip.start_date} ~ {trip.end_date}</span>
@@ -85,14 +89,14 @@ export default function JoinTrip() {
           </p>
         </div>
 
-        <div className="bg-white/70 backdrop-blur rounded-2xl p-6 space-y-4">
-          <p className="text-gray-600">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white/50 p-6 space-y-5">
+          <p className="text-sm text-gray-500 leading-relaxed">
             여행의 추억을 함께 남겨주세요!<br />
             각 페이지의 빈 영역에 메시지를 작성할 수 있습니다.
           </p>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 text-left">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider text-left">
               이름
             </label>
             <input
@@ -100,16 +104,19 @@ export default function JoinTrip() {
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
               placeholder="이름을 입력해주세요"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-300 focus:border-orange-400 outline-none"
+              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-800
+                placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400
+                transition-all duration-150"
               onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
             />
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-red-500">{error}</p>}
 
           <button
             onClick={handleJoin}
-            className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-xl transition-colors"
+            className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                       text-white font-semibold rounded-xl transition-all duration-150"
           >
             참여하기
           </button>

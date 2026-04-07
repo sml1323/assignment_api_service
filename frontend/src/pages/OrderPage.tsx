@@ -107,7 +107,10 @@ export default function OrderPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">불러오는 중...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+          <p className="text-sm text-gray-400">불러오는 중...</p>
+        </div>
       </div>
     );
   }
@@ -115,20 +118,23 @@ export default function OrderPage() {
   if (!trip) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-500">여행을 찾을 수 없습니다</p>
+        <p className="text-sm text-red-500">여행을 찾을 수 없습니다</p>
       </div>
     );
   }
 
   if (trip.status !== 'finalized' && trip.status !== 'ordered') {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-5">
         <div className="text-center space-y-4">
-          <p className="text-4xl">📖</p>
-          <p className="text-gray-600">포토북을 먼저 확정해주세요</p>
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl">📖</span>
+          </div>
+          <p className="text-sm text-gray-500">포토북을 먼저 확정해주세요</p>
           <button
             onClick={() => navigate(`/trip/${tripId}/admin?token=${adminToken}`)}
-            className="px-6 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors"
+            className="px-6 py-3 bg-orange-500 text-white rounded-xl font-medium
+                       hover:bg-orange-600 active:scale-[0.98] transition-all duration-150"
           >
             대시보드로 이동
           </button>
@@ -140,38 +146,41 @@ export default function OrderPage() {
   const sufficient = estimate && balance ? balance.balance >= estimate.paidCreditAmount : true;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-md mx-auto space-y-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-md mx-auto px-5 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate(`/trip/${tripId}/admin?token=${adminToken}`)}
-            className="text-gray-500 hover:text-gray-700 text-sm"
+            className="text-gray-300 hover:text-gray-500 transition-colors"
           >
-            ← 대시보드
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
-          <h1 className="text-lg font-serif font-bold text-gray-800">
+          <h1 className="text-lg font-semibold text-gray-800">
             {trip.status === 'ordered' ? '주문 현황' : '주문하기'}
           </h1>
-          <div className="w-16" />
+          <div className="w-5" />
         </div>
+      </div>
 
+      <div className="max-w-md mx-auto px-5 py-5 space-y-5">
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="p-3 bg-red-50 border border-red-100 rounded-2xl">
+            <p className="text-sm text-red-500">{error}</p>
           </div>
         )}
 
         {trip.status === 'finalized' && (
           <>
             <EstimateSection estimate={estimate} loading={false} />
-
             <ShippingForm
               onSubmit={handleOrder}
               submitLabel={sufficient ? '주문하기' : '충전금 부족'}
               loading={ordering}
               disabled={!sufficient}
             />
-
             <CreditBalanceDisplay
               balance={balance}
               paidAmount={estimate?.paidCreditAmount}
@@ -182,9 +191,11 @@ export default function OrderPage() {
 
         {trip.status === 'ordered' && orderDetail && (
           <>
-            <div className="bg-white rounded-xl p-6 shadow-sm text-center">
-              <p className="text-4xl mb-2">📦</p>
-              <h2 className="text-lg font-medium text-gray-800">주문 완료</h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center">
+              <div className="w-14 h-14 bg-violet-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">📦</span>
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800">주문 완료</h2>
               <p className="text-xs text-gray-400 font-mono mt-1">{trip.sweetbook_order_uid}</p>
             </div>
 
@@ -198,14 +209,14 @@ export default function OrderPage() {
               />
             ) : (
               orderDetail.shipping && (
-                <div className="bg-white rounded-xl p-6 shadow-sm">
-                  <h2 className="text-sm font-medium text-gray-700 mb-3">배송 정보</h2>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <p>{orderDetail.shipping.recipientName} | {orderDetail.shipping.recipientPhone}</p>
+                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">배송 정보</p>
+                  <div className="space-y-1.5 text-sm text-gray-600">
+                    <p className="font-medium text-gray-800">{orderDetail.shipping.recipientName} | {orderDetail.shipping.recipientPhone}</p>
                     <p>{orderDetail.shipping.address1}</p>
                     {orderDetail.shipping.address2 && <p>{orderDetail.shipping.address2}</p>}
                     {orderDetail.shipping.memo && (
-                      <p className="text-gray-400">메모: {orderDetail.shipping.memo}</p>
+                      <p className="text-gray-400 text-xs mt-2">메모: {orderDetail.shipping.memo}</p>
                     )}
                   </div>
                 </div>
@@ -213,7 +224,6 @@ export default function OrderPage() {
             )}
 
             <CreditBalanceDisplay balance={balance} loading={false} />
-
             <OrderActions
               orderStatus={orderDetail.orderStatus || 20}
               onCancel={handleCancel}

@@ -3,6 +3,20 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { getTrip, getPages, uploadPagesBulk, updateTripStatus, finalizeBook, reorderPages, getAuditLog, getOrderStatus, getCreditBalance, getCreditTransactions, sandboxCharge } from '../lib/api';
 import type { Trip, Page, AuditEntry } from '../lib/api';
 
+const statusLabels: Record<string, string> = {
+  draft: '초안',
+  collecting: '수집 중',
+  finalized: '확정됨',
+  ordered: '주문 완료',
+};
+
+const statusColors: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-500',
+  collecting: 'bg-emerald-50 text-emerald-600',
+  finalized: 'bg-blue-50 text-blue-600',
+  ordered: 'bg-violet-50 text-violet-600',
+};
+
 export default function TripAdmin() {
   const { tripId } = useParams<{ tripId: string }>();
   const [searchParams] = useSearchParams();
@@ -44,12 +58,10 @@ export default function TripAdmin() {
       ]);
       setTrip(t);
       setPages(p);
-      // Load audit log
       try {
         const audit = await getAuditLog(tripId, adminToken);
         setAuditLog(audit);
       } catch {}
-      // Load order detail if ordered
       if (t.status === 'ordered' && t.sweetbook_order_uid) {
         try {
           const od = await getOrderStatus(tripId, adminToken);
@@ -108,45 +120,56 @@ export default function TripAdmin() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><p className="text-gray-500">로딩 중...</p></div>;
-  }
-
-  if (error || !trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-red-500 mb-2">{error || '여행을 찾을 수 없습니다'}</p>
-          <button onClick={() => navigate('/')} className="text-orange-500 hover:underline">홈으로</button>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+          <p className="text-sm text-gray-400">불러오는 중...</p>
         </div>
       </div>
     );
   }
 
-  const statusLabels: Record<string, string> = {
-    draft: '초안',
-    collecting: '참여 수집 중',
-    finalized: '확정됨',
-    ordered: '주문 완료',
-  };
+  if (error || !trip) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-5">
+        <div className="text-center space-y-3">
+          <p className="text-sm text-red-500">{error || '여행을 찾을 수 없습니다'}</p>
+          <button onClick={() => navigate('/')} className="text-sm text-orange-500 hover:text-orange-600 transition-colors">
+            홈으로
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const statusColors: Record<string, string> = {
-    draft: 'bg-gray-100 text-gray-600',
-    collecting: 'bg-green-100 text-green-700',
-    finalized: 'bg-blue-100 text-blue-700',
-    ordered: 'bg-purple-100 text-purple-700',
-  };
+  const tabItems = [
+    { key: 'pages' as const, label: '페이지' },
+    { key: 'status' as const, label: '참여' },
+    { key: 'order' as const, label: '주문' },
+    { key: 'credits' as const, label: '충전금' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b px-4 py-4">
-        <div className="max-w-3xl mx-auto">
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-2xl mx-auto px-5 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-serif font-bold text-gray-800">{trip.title}</h1>
-              <p className="text-sm text-gray-500">{trip.destination} · {trip.page_count}페이지</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <button onClick={() => navigate('/')} className="text-gray-300 hover:text-gray-500 transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div className="min-w-0">
+                  <h1 className="text-lg font-semibold text-gray-800 truncate">{trip.title}</h1>
+                  <p className="text-xs text-gray-400">{trip.destination} · {trip.page_count}p</p>
+                </div>
+              </div>
             </div>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[trip.status]}`}>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 ${statusColors[trip.status]}`}>
               {statusLabels[trip.status]}
             </span>
           </div>
@@ -154,58 +177,58 @@ export default function TripAdmin() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b">
-        <div className="max-w-3xl mx-auto flex">
-          {(['pages', 'status', 'order', 'credits'] as const).map((t) => (
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-2xl mx-auto flex px-5">
+          {tabItems.map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.key}
+              onClick={() => setTab(t.key)}
               className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                tab === t
+                tab === t.key
                   ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
-              {t === 'pages' ? '페이지 관리' : t === 'status' ? '참여 현황' : t === 'order' ? '주문' : '충전금'}
+              {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto p-4">
-        {/* Kakao Alert Banner */}
-        {!trip.sweetbook_order_uid && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-yellow-800">카카오톡 알림</p>
-              <p className="text-xs text-yellow-600">포토북 확정/주문 시 카카오톡으로 알림을 받습니다</p>
-            </div>
-            <a
-              href={`/api/auth/kakao/login?trip_id=${tripId}&admin_token=${adminToken}`}
-              className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-lg text-sm font-medium transition-colors flex-shrink-0"
-            >
-              카카오 연결
-            </a>
-          </div>
-        )}
-
-        {/* Share Link */}
+      <div className="max-w-2xl mx-auto px-5 py-5">
+        {/* Share Link Banner */}
         {trip.status === 'collecting' && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
-            <p className="text-sm font-medium text-orange-800 mb-2">공유 링크</p>
+          <div className="bg-orange-50 rounded-2xl p-4 mb-5 border border-orange-100">
+            <p className="text-xs font-medium text-orange-600 mb-2">공유 링크</p>
             <div className="flex gap-2">
               <input
                 readOnly
                 value={shareUrl}
-                className="flex-1 px-3 py-2 bg-white border border-orange-200 rounded-lg text-sm text-gray-600"
+                className="flex-1 px-3 py-2 bg-white border border-orange-200 rounded-xl text-xs text-gray-500 truncate"
               />
               <button
                 onClick={copyShareLink}
-                className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 transition-colors"
+                className="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600 active:scale-[0.98] transition-all duration-150 flex-shrink-0"
               >
                 {copied ? '복사됨!' : '복사'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Kakao Banner */}
+        {!trip.sweetbook_order_uid && trip.status !== 'draft' && (
+          <div className="bg-amber-50 rounded-2xl p-4 mb-5 border border-amber-100 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-700">카카오톡 알림</p>
+              <p className="text-xs text-amber-500 mt-0.5">확정/주문 시 알림을 받습니다</p>
+            </div>
+            <a
+              href={`/api/auth/kakao/login?trip_id=${tripId}&admin_token=${adminToken}`}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-amber-900 rounded-xl text-sm font-medium transition-colors flex-shrink-0"
+            >
+              연결
+            </a>
           </div>
         )}
 
@@ -225,25 +248,32 @@ export default function TripAdmin() {
                 <button
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
-                  className="w-full py-4 border-2 border-dashed border-gray-300 hover:border-orange-400 rounded-xl text-gray-500 hover:text-orange-500 transition-colors"
+                  className="w-full py-10 border-2 border-dashed border-gray-200 hover:border-orange-300
+                             rounded-2xl text-gray-400 hover:text-orange-500 transition-all duration-200
+                             flex flex-col items-center gap-2"
                 >
-                  {uploading ? '업로드 중...' : '📷 사진 일괄 업로드'}
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                  </svg>
+                  <span className="text-sm font-medium">{uploading ? '업로드 중...' : '사진 일괄 업로드'}</span>
                 </button>
               </>
             )}
 
             {pages.length === 0 ? (
-              <p className="text-center text-gray-400 py-8">아직 페이지가 없습니다</p>
+              <div className="text-center py-16">
+                <p className="text-gray-300 text-sm">아직 페이지가 없습니다</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {pages.map((page, idx) => {
                   const claimedCount = page.zones.filter((z) => z.claimed_by).length;
                   const isExpanded = expandedPage === page.id;
                   return (
-                    <div key={page.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
+                    <div key={page.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                       <div className="flex gap-3 p-3">
-                        {/* Reorder buttons */}
-                        <div className="flex flex-col justify-center gap-1 flex-shrink-0">
+                        {/* Reorder */}
+                        <div className="flex flex-col justify-center gap-0.5 flex-shrink-0">
                           <button
                             onClick={async () => {
                               if (idx === 0) return;
@@ -253,9 +283,9 @@ export default function TripAdmin() {
                               await loadData();
                             }}
                             disabled={idx === 0}
-                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 disabled:text-gray-200 text-xs"
+                            className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:text-gray-200 text-xs transition-colors"
                           >▲</button>
-                          <span className="text-[10px] text-gray-300 text-center">{idx + 1}</span>
+                          <span className="text-[10px] text-gray-300 text-center font-medium">{idx + 1}</span>
                           <button
                             onClick={async () => {
                               if (idx === pages.length - 1) return;
@@ -265,58 +295,61 @@ export default function TripAdmin() {
                               await loadData();
                             }}
                             disabled={idx === pages.length - 1}
-                            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 disabled:text-gray-200 text-xs"
+                            className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:text-gray-200 text-xs transition-colors"
                           >▼</button>
                         </div>
 
                         <img
                           src={page.photo_url}
                           alt={`Page ${page.page_number}`}
-                          className="w-20 h-16 object-cover rounded-lg flex-shrink-0 cursor-pointer"
+                          className="w-20 h-16 object-cover rounded-xl flex-shrink-0 cursor-pointer"
                           onClick={() => setExpandedPage(isExpanded ? null : page.id)}
                         />
                         <div
                           className="flex-1 min-w-0 cursor-pointer"
                           onClick={() => setExpandedPage(isExpanded ? null : page.id)}
                         >
-                          <p className="text-sm font-medium text-gray-700 truncate">
+                          <p className="text-sm font-medium text-gray-800 truncate">
                             {page.subtitle || `Page ${page.page_number}`}
                           </p>
                           <p className="text-xs text-gray-400 mt-0.5">
-                            {claimedCount}/{page.zones.length} 존 작성됨
+                            {claimedCount}/{page.zones.length} 작성됨
                           </p>
-                          <div className="flex gap-1 mt-1">
+                          <div className="flex gap-1 mt-1.5">
                             {page.zones.map((z) => (
                               <div
                                 key={z.id}
-                                className={`w-2 h-2 rounded-full ${z.claimed_by ? 'bg-orange-400' : 'bg-gray-200'}`}
+                                className={`w-1.5 h-1.5 rounded-full ${z.claimed_by ? 'bg-orange-400' : 'bg-gray-200'}`}
                               />
                             ))}
                           </div>
                         </div>
-                        <span
-                          className="text-gray-300 self-center cursor-pointer"
+                        <svg
+                          className={`w-4 h-4 text-gray-300 self-center flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                           onClick={() => setExpandedPage(isExpanded ? null : page.id)}
-                        >{isExpanded ? '▲' : '▼'}</span>
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
                       </div>
 
                       {isExpanded && (
-                        <div className="border-t px-3 pb-3 pt-2 space-y-2">
+                        <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-2">
                           {page.zones.map((zone) => (
                             <div
                               key={zone.id}
-                              className={`p-2 rounded-lg text-sm ${
+                              className={`p-3 rounded-xl text-sm ${
                                 zone.message ? 'bg-orange-50' : 'bg-gray-50'
                               }`}
                             >
-                              <span className="text-xs text-gray-400">Zone {zone.zone_number}</span>
+                              <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Zone {zone.zone_number}</span>
                               {zone.message ? (
-                                <div className="mt-1">
-                                  <p className="text-gray-700">{zone.message.content}</p>
-                                  <p className="text-xs text-gray-400 mt-1">— {zone.message.author_name}</p>
+                                <div className="mt-1.5">
+                                  <p className="text-gray-700 leading-relaxed">{zone.message.content}</p>
+                                  <p className="text-xs text-gray-400 mt-1.5">— {zone.message.author_name}</p>
                                 </div>
                               ) : (
-                                <p className="text-gray-300 mt-1">비어있음</p>
+                                <p className="text-gray-300 mt-1 text-xs">비어있음</p>
                               )}
                             </div>
                           ))}
@@ -329,21 +362,25 @@ export default function TripAdmin() {
             )}
 
             {pages.length > 0 && (
-              <button
-                onClick={() => navigate(`/trip/${tripId}/preview`)}
-                className="w-full py-3 border border-orange-300 text-orange-600 rounded-xl font-medium hover:bg-orange-50 transition-colors"
-              >
-                📖 미리보기
-              </button>
-            )}
+              <div className="space-y-3 pt-2">
+                <button
+                  onClick={() => navigate(`/trip/${tripId}/preview`)}
+                  className="w-full py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50
+                             text-gray-600 rounded-xl font-medium transition-all duration-150"
+                >
+                  미리보기
+                </button>
 
-            {trip.status === 'draft' && pages.length > 0 && (
-              <button
-                onClick={() => handleStatusChange('collecting')}
-                className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium transition-colors"
-              >
-                참여자 초대 시작하기
-              </button>
+                {trip.status === 'draft' && (
+                  <button
+                    onClick={() => handleStatusChange('collecting')}
+                    className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                               text-white rounded-xl font-medium transition-all duration-150"
+                  >
+                    참여자 초대 시작하기
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -351,31 +388,33 @@ export default function TripAdmin() {
         {/* Status Tab */}
         {tab === 'status' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-xl p-4 shadow-sm">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-600">참여 현황</span>
-                <span className="text-sm font-medium text-orange-600">
+            {/* Progress */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <div className="flex justify-between mb-3">
+                <span className="text-sm text-gray-500">참여 현황</span>
+                <span className="text-sm font-semibold text-orange-600">
                   {trip.zone_stats.claimed} / {trip.zone_stats.total}
                 </span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className="w-full bg-gray-100 rounded-full h-1.5">
                 <div
-                  className="bg-orange-500 h-2 rounded-full transition-all"
+                  className="bg-orange-500 h-1.5 rounded-full transition-all duration-500"
                   style={{ width: `${trip.zone_stats.total ? (trip.zone_stats.claimed / trip.zone_stats.total) * 100 : 0}%` }}
                 />
               </div>
             </div>
 
+            {/* Per-page status */}
             {pages.map((page) => (
-              <div key={page.id} className="bg-white rounded-xl p-4 shadow-sm">
-                <p className="text-sm font-medium text-gray-700 mb-2">{page.subtitle || `Page ${page.page_number}`}</p>
+              <div key={page.id} className="bg-white rounded-2xl border border-gray-100 p-4">
+                <p className="text-sm font-medium text-gray-800 mb-3">{page.subtitle || `Page ${page.page_number}`}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {page.zones.map((zone) => (
                     <div
                       key={zone.id}
-                      className={`p-2 rounded-lg text-xs ${
+                      className={`px-3 py-2 rounded-xl text-xs ${
                         zone.claimed_by
-                          ? 'bg-orange-50 text-orange-700'
+                          ? 'bg-orange-50 text-orange-600'
                           : 'bg-gray-50 text-gray-400'
                       }`}
                     >
@@ -387,19 +426,22 @@ export default function TripAdmin() {
             ))}
 
             {trip.status === 'collecting' && (
-              <div className="space-y-3">
+              <div className="space-y-3 pt-2">
                 <button
                   onClick={() => navigate(`/trip/${tripId}/preview`)}
-                  className="w-full py-3 border border-orange-300 text-orange-600 rounded-xl font-medium hover:bg-orange-50 transition-colors"
+                  className="w-full py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50
+                             text-gray-600 rounded-xl font-medium transition-all duration-150"
                 >
                   미리보기
                 </button>
                 <button
                   onClick={handleFinalize}
                   disabled={finalizing}
-                  className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white rounded-xl font-medium transition-colors"
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                             disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100
+                             text-white rounded-xl font-medium transition-all duration-150"
                 >
-                  {finalizing ? '포토북 생성 중... (최대 30초)' : '포토북 확정하기'}
+                  {finalizing ? '포토북 생성 중...' : '포토북 확정하기'}
                 </button>
               </div>
             )}
@@ -408,111 +450,107 @@ export default function TripAdmin() {
 
         {/* Order Tab */}
         {tab === 'order' && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {trip.status === 'finalized' ? (
-              <div className="text-center space-y-4">
-                <p className="text-6xl">✅</p>
-                <h2 className="text-lg font-medium text-gray-800">포토북이 확정되었습니다</h2>
-                <div className="bg-white rounded-xl p-4 shadow-sm text-left space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Book UID</span>
-                    <span className="text-gray-700 font-mono text-xs">{trip.sweetbook_book_uid}</span>
+              <div className="space-y-5">
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">사양</span>
-                    <span className="text-gray-700">A4 소프트커버 포토북</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">페이지 수</span>
-                    <span className="text-gray-700">{trip.page_count}p (최소 24p)</span>
-                  </div>
+                  <h2 className="text-lg font-semibold text-gray-800">포토북 확정 완료</h2>
+                  <p className="text-sm text-gray-400 mt-1">주문할 준비가 되었습니다</p>
                 </div>
+
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+                  {[
+                    { label: 'Book UID', value: trip.sweetbook_book_uid, mono: true },
+                    { label: '사양', value: 'A4 소프트커버 포토북' },
+                    { label: '페이지', value: `${trip.page_count}p (최소 24p)` },
+                  ].map((row) => (
+                    <div key={row.label} className="flex justify-between text-sm">
+                      <span className="text-gray-400">{row.label}</span>
+                      <span className={`text-gray-700 ${row.mono ? 'font-mono text-xs' : ''}`}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+
                 <button
                   onClick={() => navigate(`/trip/${tripId}/order?token=${adminToken}`)}
-                  className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-medium transition-colors"
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                             text-white rounded-xl font-semibold transition-all duration-150"
                 >
                   주문하기
                 </button>
               </div>
             ) : trip.status === 'ordered' ? (
-              <div className="space-y-4">
-                <div className="text-center">
-                  <p className="text-4xl mb-2">📦</p>
-                  <h2 className="text-lg font-medium text-gray-800">주문 완료</h2>
+              <div className="space-y-5">
+                <div className="text-center py-2">
+                  <h2 className="text-lg font-semibold text-gray-800">주문 완료</h2>
                   <p className="text-xs text-gray-400 font-mono mt-1">{trip.sweetbook_order_uid}</p>
                 </div>
 
-                {/* Order Status Timeline */}
-                <div className="bg-white rounded-xl p-4 shadow-sm">
-                  <p className="text-sm font-medium text-gray-700 mb-3">주문 상태</p>
-                  <div className="space-y-3">
+                {/* Timeline */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">주문 상태</p>
+                  <div className="space-y-4">
                     {[
                       { code: 20, label: '결제 완료', icon: '💳' },
                       { code: 25, label: 'PDF 생성', icon: '📄' },
                       { code: 30, label: '제작 확정', icon: '✅' },
                       { code: 40, label: '인쇄 중', icon: '🖨️' },
                       { code: 50, label: '인쇄 완료', icon: '📋' },
-                      { code: 60, label: '발송 완료', icon: '🚚' },
+                      { code: 60, label: '발송', icon: '🚚' },
                       { code: 70, label: '배송 완료', icon: '🎉' },
-                    ].map((step, i) => {
+                    ].map((step) => {
                       const currentCode = orderDetail?.orderStatus || 20;
                       const isDone = step.code <= currentCode;
                       const isCurrent = step.code === currentCode;
                       return (
                         <div key={step.code} className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 ${
-                            isDone ? 'bg-green-100' : 'bg-gray-100'
-                          } ${isCurrent ? 'ring-2 ring-green-400' : ''}`}>
-                            {isDone ? step.icon : <span className="text-gray-300">{i + 1}</span>}
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0
+                            ${isDone ? 'bg-emerald-50' : 'bg-gray-50'}
+                            ${isCurrent ? 'ring-2 ring-emerald-400 ring-offset-2' : ''}`}>
+                            {step.icon}
                           </div>
-                          <span className={`text-sm ${isDone ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
+                          <span className={`text-sm flex-1 ${isDone ? 'text-gray-800 font-medium' : 'text-gray-300'}`}>
                             {step.label}
                           </span>
-                          {isCurrent && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">현재</span>}
+                          {isCurrent && (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-medium">현재</span>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-
-                {/* Order Summary */}
-                {orderDetail && (
-                  <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
-                    <p className="text-sm font-medium text-gray-700">주문 정보</p>
-                    {orderDetail.orderStatusDisplay && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">상태</span>
-                        <span className="text-gray-700">{orderDetail.orderStatusDisplay}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-400">포토북 확정 후 주문할 수 있습니다</p>
+              <div className="text-center py-16">
+                <p className="text-sm text-gray-300">포토북 확정 후 주문할 수 있습니다</p>
               </div>
             )}
 
-            {/* Audit Log Timeline */}
+            {/* Audit Log */}
             {auditLog.length > 0 && (
-              <div className="bg-white rounded-xl p-4 shadow-sm">
-                <p className="text-sm font-medium text-gray-700 mb-3">활동 로그</p>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">활동 로그</p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                   {auditLog.slice(0, 20).map((entry) => (
-                    <div key={entry.id} className="flex items-start gap-2 text-xs">
-                      <span className="text-gray-300 flex-shrink-0 w-14">
+                    <div key={entry.id} className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-300 flex-shrink-0 w-12 tabular-nums">
                         {new Date(entry.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] flex-shrink-0 ${
-                        entry.action.startsWith('webhook') ? 'bg-purple-50 text-purple-600' :
-                        entry.action.startsWith('order') ? 'bg-blue-50 text-blue-600' :
-                        entry.action.startsWith('book') ? 'bg-green-50 text-green-600' :
-                        'bg-gray-50 text-gray-500'
+                      <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium flex-shrink-0 ${
+                        entry.action.startsWith('webhook') ? 'bg-violet-50 text-violet-500' :
+                        entry.action.startsWith('order') ? 'bg-blue-50 text-blue-500' :
+                        entry.action.startsWith('book') ? 'bg-emerald-50 text-emerald-500' :
+                        'bg-gray-50 text-gray-400'
                       }`}>
                         {entry.action}
                       </span>
-                      <span className="text-gray-500">{entry.actor}</span>
+                      <span className="text-gray-400 truncate">{entry.actor}</span>
                     </div>
                   ))}
                 </div>
@@ -587,28 +625,33 @@ function CreditsTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Balance */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">충전금 잔액</h2>
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">충전금 잔액</p>
         {creditBalance != null ? (
           <div>
-            <p className="text-3xl font-bold text-gray-800">{creditBalance.toLocaleString()}원</p>
-            {creditEnv && <p className="text-xs text-gray-400 mt-1">{creditEnv === 'test' ? 'Sandbox' : '운영'} 환경</p>}
+            <p className="text-3xl font-bold text-gray-800 tracking-tight">{creditBalance.toLocaleString()}<span className="text-lg font-normal text-gray-400 ml-1">원</span></p>
+            {creditEnv && (
+              <span className="inline-block mt-2 px-2 py-0.5 bg-gray-50 text-gray-400 text-[10px] font-medium rounded-full uppercase tracking-wider">
+                {creditEnv === 'test' ? 'Sandbox' : 'Production'}
+              </span>
+            )}
           </div>
         ) : (
-          <p className="text-gray-400">로딩 중...</p>
+          <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
         )}
       </div>
 
       {/* Sandbox Charge */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">Sandbox 테스트 충전</h2>
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">테스트 충전</p>
         <div className="flex gap-2">
           <select
             value={chargeAmount}
             onChange={(e) => setChargeAmount(e.target.value)}
-            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white
+                       focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 transition-all"
           >
             <option value="10000">10,000원</option>
             <option value="50000">50,000원</option>
@@ -618,31 +661,33 @@ function CreditsTab({
           <button
             onClick={handleCharge}
             disabled={charging}
-            className="px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white text-sm rounded-lg transition-colors"
+            className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                       disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100
+                       text-white text-sm font-medium rounded-xl transition-all duration-150"
           >
-            {charging ? '충전 중...' : '충전'}
+            {charging ? '...' : '충전'}
           </button>
         </div>
-        {chargeSuccess && <p className="text-sm text-green-600 mt-2">{chargeSuccess}</p>}
+        {chargeSuccess && <p className="text-sm text-emerald-600 mt-2">{chargeSuccess}</p>}
         {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
       </div>
 
       {/* Transactions */}
-      <div className="bg-white rounded-xl p-6 shadow-sm">
-        <h2 className="text-sm font-medium text-gray-700 mb-3">거래 내역</h2>
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">거래 내역</p>
         {transactions.length === 0 ? (
-          <p className="text-sm text-gray-400">거래 내역이 없습니다</p>
+          <p className="text-sm text-gray-300">거래 내역이 없습니다</p>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-gray-50">
             {transactions.map((tx: any, i: number) => (
-              <div key={tx.transactionId || i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+              <div key={tx.transactionId || i} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                 <div>
                   <p className="text-sm text-gray-700">{tx.reasonDisplay || tx.memo || '거래'}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 mt-0.5">
                     {new Date(tx.createdAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
-                <span className={`text-sm font-medium ${tx.direction === '+' ? 'text-green-600' : 'text-red-500'}`}>
+                <span className={`text-sm font-semibold tabular-nums ${tx.direction === '+' ? 'text-emerald-600' : 'text-red-500'}`}>
                   {tx.direction === '+' ? '+' : ''}{tx.amount?.toLocaleString()}원
                 </span>
               </div>

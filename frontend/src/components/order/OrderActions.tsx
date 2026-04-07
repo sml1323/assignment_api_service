@@ -27,7 +27,8 @@ export default function OrderActions({ orderStatus, onCancel, onEditShipping }: 
       {canEditShipping && (
         <button
           onClick={onEditShipping}
-          className="w-full py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
+          className="w-full py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50
+                     text-gray-600 rounded-xl font-medium transition-all duration-150"
         >
           배송지 변경
         </button>
@@ -36,7 +37,8 @@ export default function OrderActions({ orderStatus, onCancel, onEditShipping }: 
         <button
           onClick={handleCancel}
           disabled={cancelling}
-          className="w-full py-3 border border-red-300 text-red-600 rounded-xl font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+          className="w-full py-3 border border-red-200 text-red-500 rounded-xl font-medium
+                     hover:bg-red-50 disabled:opacity-50 transition-all duration-150"
         >
           {cancelling ? '취소 처리 중...' : '주문 취소'}
         </button>
