@@ -44,57 +44,17 @@
 
 ## 실행 방법
 
-### Docker (권장)
-
 ```bash
 git clone https://github.com/sml1323/assignment_api_service.git
 cd assignment_api_service
 
 cp .env.example .env
-# .env 파일에 BOOKPRINT_API_KEY 입력
+# .env 파일에 BOOKPRINT_API_KEY 입력 (Sandbox Key)
 
 docker compose up --build
 ```
 
 브라우저에서 `http://localhost:8000` 접속. 더미 데이터 자동 생성됨.
-
-### 로컬 실행
-
-#### 요구사항
-
-- Python 3.10+
-- Node.js 18+
-- Book Print API Sandbox Key ([api.sweetbook.com](https://api.sweetbook.com) 가입 후 발급)
-
-### 설치 및 실행
-
-```bash
-# 저장소 클론
-git clone https://github.com/sml1323/assignment_api_service.git
-cd assignment_api_service
-
-# 백엔드 설치
-pip install -r backend/requirements.txt
-pip install -e bookprintapi-python-sdk
-
-# 프론트엔드 설치
-cd frontend && npm install && cd ..
-
-# 환경변수 설정
-cp .env.example .env
-# .env 파일에 BOOKPRINT_API_KEY 입력 (Sandbox Key)
-
-# 프론트엔드 빌드
-cd frontend && npm run build && cd ..
-
-# 더미 데이터 생성 (데모 계정 + 제주도 2박3일 시나리오)
-python -m backend.app.seed
-
-# 서버 실행
-uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
-```
-
-브라우저에서 `http://localhost:8000` 접속
 
 ### 데모 계정
 
@@ -141,55 +101,30 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 | 템플릿 UID | 이름 | 용도 |
 |-----------|------|------|
 | `7CO28K1SttwL` | 표지 (구글포토북C) | 표지 — coverPhoto + subtitle + dateRange |
-| `50f9kmXxelPG` | 내지_monthHeader | 섹션 구분 페이지 ("APRIL 2026") |
 | `5ADDkCtrodEJ` | 내지_photo | 사진 페이지 — Pillow 합성 이미지 + dayLabel |
-| `3mjKd8kcaVzT` | 내지b | 텍스트 페이지 — 참여자 하단 존 메시지 |
+| `3mjKd8kcaVzT` | 내지b | Day 간지 + 텍스트 페이지 — monthNum + dayNum + diaryText |
 | `5NxuQPBMyuTm` | 빈내지 | 최소 24페이지 충족용 패딩 |
 
 ---
 
 ## API 연동 플로우
 
-```
-주최자 플로우                              Sweetbook API
-─────────────                            ──────────────
-                                         
- ┌──────────┐    ┌──────────┐    ┌──────────────┐
- │ 사진 업로드 │───→│ Pillow   │───→│ photos       │
- │ (일괄)    │    │ 텍스트합성 │    │ .upload      │
- └──────────┘    └──────────┘    └──────┬───────┘
-                                        │
-                                 ┌──────▼───────┐
-                                 │ covers       │
-                                 │ .create      │
-                                 │ (구글포토북C)  │
-                                 └──────┬───────┘
-                                        │
-                                 ┌──────▼───────┐
-                                 │ contents     │  ← monthHeader
-                                 │ .insert      │  ← 내지_photo (합성 이미지)
-                                 │ (반복)       │  ← 내지b (텍스트)
-                                 └──────┬───────┘
-                                        │
-                                 ┌──────▼───────┐
-                                 │ finalize     │
-                                 │ (책 확정)     │
-                                 └──────┬───────┘
-                                        │
-                                 ┌──────▼───────┐    ┌──────────────┐
-                                 │ estimate     │───→│ 가격 확인      │
-                                 │ (견적)       │    │ + 잔액 확인    │
-                                 └──────┬───────┘    └──────────────┘
-                                        │
-                                 ┌──────▼───────┐
-                                 │ orders       │  → 자동 충전 (잔액 부족 시)
-                                 │ .create      │  → 충전금 즉시 차감
-                                 └──────┬───────┘
-                                        │
-  ┌──────────┐                   ┌──────▼───────┐
-  │ DB 업데이트│←──── Webhook ←───│ 상태 변경 알림 │
-  │ AuditLog │    (서명 검증)     │ (PAID→SHIPPED)│
-  └──────────┘    (idempotency)  └──────────────┘
+```mermaid
+flowchart TD
+    A["확정하기 버튼 클릭"] --> B["POST /books<br/>책 생성 (PHOTOBOOK_A4_SC)"]
+    B --> C["Pillow 텍스트 합성<br/>(오버레이 존 → 사진에 베이킹)"]
+    C --> D["POST /books/{id}/photos<br/>합성 이미지 업로드"]
+    D --> E["POST /books/{id}/cover<br/>표지 생성 (구글포토북C)"]
+    E --> F["POST /books/{id}/contents<br/>Day별 반복: 간지 + 사진 + 텍스트"]
+    F --> G["POST /books/{id}/finalization<br/>책 확정"]
+    G --> H["POST /orders/estimate<br/>견적 조회"]
+    H --> I["POST /orders<br/>주문 생성 + 충전금 차감"]
+    I --> J["Webhook 수신<br/>서명 검증 + idempotency"]
+    J --> K["DB 업데이트 + AuditLog"]
+
+    style A fill:#f97316,color:#fff
+    style G fill:#059669,color:#fff
+    style I fill:#2563eb,color:#fff
 ```
 
 ### 주문 상태 흐름
