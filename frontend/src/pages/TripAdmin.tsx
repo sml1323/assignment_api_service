@@ -275,22 +275,6 @@ export default function TripAdmin() {
           </div>
         )}
 
-        {/* Kakao Banner */}
-        {!trip.sweetbook_order_uid && trip.status !== 'draft' && (
-          <div className="bg-amber-50 rounded-2xl p-4 mb-5 border border-amber-100 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-amber-700">카카오톡 알림</p>
-              <p className="text-xs text-amber-500 mt-0.5">확정/주문 시 알림을 받습니다</p>
-            </div>
-            <a
-              href={`/api/auth/kakao/login?trip_id=${tripId}&admin_token=${adminToken}`}
-              className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-amber-900 rounded-xl text-sm font-medium transition-colors flex-shrink-0"
-            >
-              연결
-            </a>
-          </div>
-        )}
-
         {/* Album Tab */}
         {tab === 'album' && (
           <div className="space-y-4">

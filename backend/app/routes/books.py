@@ -15,7 +15,6 @@ from ..services.sweetbook import (
 from bookprintapi import ApiError
 from ..services.image import compose_photo_with_text, UPLOAD_DIR
 from ..services.audit import log_action
-from ..services.kakao import notify_book_finalized, notify_order_created
 
 router = APIRouter(prefix="/api/trips", tags=["books"])
 
@@ -113,17 +112,6 @@ def finalize_book(
     log_action(db, "book.finalize", "admin", trip_id=trip.id, target=result["book_uid"], detail={"page_count": result["page_count"]})
     db.commit()
 
-    # 카카오톡 알림 (사용자 토큰으로)
-    if trip.kakao_access_token:
-        ok, new_at, new_rt = notify_book_finalized(
-            trip.title, trip.id, result["page_count"],
-            trip.kakao_access_token, trip.kakao_refresh_token or "",
-        )
-        if new_at != trip.kakao_access_token or new_rt != (trip.kakao_refresh_token or ""):
-            trip.kakao_access_token = new_at
-            trip.kakao_refresh_token = new_rt
-            db.commit()
-
     return {
         "book_uid": result["book_uid"],
         "page_count": result["page_count"],
@@ -196,16 +184,6 @@ def place_order(
     trip.status = "ordered"
     log_action(db, "order.create", "admin", trip_id=trip.id, target=result["data"]["orderUid"])
     db.commit()
-
-    if trip.kakao_access_token:
-        ok, new_at, new_rt = notify_order_created(
-            trip.title, trip.id, result["data"]["orderUid"],
-            trip.kakao_access_token, trip.kakao_refresh_token or "",
-        )
-        if new_at != trip.kakao_access_token:
-            trip.kakao_access_token = new_at
-            trip.kakao_refresh_token = new_rt
-            db.commit()
 
     return {
         "order_uid": result["data"]["orderUid"],

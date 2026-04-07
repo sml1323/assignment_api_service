@@ -11,7 +11,6 @@ from fastapi import APIRouter, Request, HTTPException
 from ..database import SessionLocal
 from ..models import Trip, WebhookLog
 from ..services.audit import log_action
-from ..services.kakao import notify_order_status
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
@@ -69,10 +68,6 @@ async def handle_sweetbook_webhook(request: Request):
                         log_action(db, f"webhook.{event_type}", "webhook",
                                    trip_id=trip.id, target=order_uid,
                                    detail=payload.get("data", {}))
-                        # 카카오톡 알림
-                        status_code = payload.get("data", {}).get("orderStatus", "")
-                        status_display = payload.get("data", {}).get("orderStatusDisplay", "")
-                        notify_order_status(trip.title, trip.id, str(status_code), status_display)
             log_entry.status = "processed"
             log_entry.processed_at = datetime.now(timezone.utc)
         except Exception as e:

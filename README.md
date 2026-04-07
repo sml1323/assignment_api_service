@@ -11,15 +11,34 @@
 ### 주요 기능
 
 - **회원 시스템** — 간단한 가입/로그인, 내 여행 목록 관리
-- **사진 일괄 업로드** — 여행 사진을 한 번에 올리면 자동으로 페이지 구성
+- **Day 기반 앨범 구성** — 출발일/도착일 입력 시 Day 자동 생성, 사진을 Day별로 분류
+- **사진 일괄 업로드** — Day별 드래그 앤 드롭으로 사진 업로드, Day 간 사진 이동 가능
+- **표지 사진 지정** — 업로드된 사진 중 하나를 표지로 선택
 - **공유 링크로 협업** — 링크를 보내면 참여자가 각 페이지에 텍스트 추억을 남김 (비회원 가능)
 - **사진 위 텍스트 배치** — 드래그로 위치 이동, 8가지 색상 프리셋 선택
-- **미리보기** — react-pageflip 기반 페이지 넘기기 애니메이션
+- **미리보기** — 표지 → 목차 → Day 구분 페이지 → 사진 페이지 → 뒷표지 순서로 열람
 - **포토북 인쇄 주문** — Book Print API 연동으로 실물 책 주문 (A4 소프트커버)
 - **주문 관리** — 견적 조회, 주문 생성, 취소, 배송지 변경
 - **충전금 관리** — 잔액 조회, Sandbox 테스트 충전, 거래 내역
-- **카카오톡 알림** — 포토북 확정/주문 시 카카오톡 알림 (선택)
 - **Webhook 연동** — 주문 상태 변경 실시간 수신 + HMAC 서명 검증
+
+### 화면 미리보기
+
+| 랜딩 페이지 | 내 여행 목록 |
+|:---:|:---:|
+| ![랜딩](images/01-landing.png) | ![내 여행](images/02-my-trips.png) |
+
+| 관리자 앨범 (Day별 사진 구성) | 참여 현황 |
+|:---:|:---:|
+| ![앨범](images/03-admin-album.png) | ![참여현황](images/06-admin-participate.png) |
+
+| 미리보기 — 표지 | 미리보기 — 사진+메시지 |
+|:---:|:---:|
+| ![표지](images/05-preview-cover.png) | ![사진](images/04-preview-photo.png) |
+
+| 참여자 진입 | 메시지 작성 |
+|:---:|:---:|
+| ![참여](images/07-join-trip.png) | ![작성](images/08-contribute.png) |
 
 ---
 
@@ -68,7 +87,7 @@ cp .env.example .env
 # 프론트엔드 빌드
 cd frontend && npm run build && cd ..
 
-# 더미 데이터 생성 (데모 계정 + 제주도 3박4일 시나리오)
+# 더미 데이터 생성 (데모 계정 + 제주도 2박3일 시나리오)
 python -m backend.app.seed
 
 # 서버 실행
@@ -85,14 +104,8 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 |-------|---------|
 | demo | demo1234 |
 
-> 로그인하면 "내 여행" 목록에 제주도 3박4일 더미 데이터가 표시됩니다.
+> 로그인하면 "내 여행" 목록에 제주도 2박3일 더미 데이터가 표시됩니다.
 > 시드 실행 시 콘솔에 주최자 대시보드 URL과 참여자 링크도 출력됩니다.
-
-### 카카오톡 알림 (선택)
-
-카카오 알림 기능을 사용하려면 카카오 개발자 앱 설정이 필요합니다.
-`.env`에 `KAKAO_REST_API_KEY`를 입력하면 활성화됩니다.
-없어도 모든 핵심 기능은 정상 동작합니다.
 
 ---
 
@@ -121,7 +134,7 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 | 이벤트 | 처리 |
 |-------|------|
 | `order.status_changed` | 주문 상태 업데이트 + AuditLog 기록 |
-| `order.shipped` | 배송 정보 업데이트 + 카카오 알림 |
+| `order.shipped` | 배송 정보 업데이트 |
 
 ### 사용한 템플릿
 
@@ -176,8 +189,7 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
   ┌──────────┐                   ┌──────▼───────┐
   │ DB 업데이트│←──── Webhook ←───│ 상태 변경 알림 │
   │ AuditLog │    (서명 검증)     │ (PAID→SHIPPED)│
-  │ 카카오알림 │    (idempotency)  └──────────────┘
-  └──────────┘
+  └──────────┘    (idempotency)  └──────────────┘
 ```
 
 ### 주문 상태 흐름
@@ -212,6 +224,7 @@ PAID(20) → PDF_READY(25) → CONFIRMED(30) → IN_PRODUCTION(40)
 | Claude Code — Superpowers (brainstorming, writing-plans, subagent-driven) | 기능 설계 → 구현 계획 → 병렬 에이전트 실행 워크플로우 |
 | Claude Code — gstack (/browse, /qa) | 헤드리스 브라우저 QA 테스트, E2E 플로우 검증 |
 | Claude Code — Codex | 독립적 second opinion (UI 구조, MVP 스코프 검증) |
+| 나노바나나 (AI 이미지 생성) | 더미 데이터용 여행 사진 6장 생성 |
 
 ---
 
@@ -219,12 +232,11 @@ PAID(20) → PDF_READY(25) → CONFIRMED(30) → IN_PRODUCTION(40)
 
 | 영역 | 기술 |
 |------|------|
-| 프론트엔드 | React 19, TypeScript, Tailwind CSS 4, react-pageflip |
+| 프론트엔드 | React 19, TypeScript, Tailwind CSS 4 |
 | 백엔드 | FastAPI, SQLAlchemy, SQLite (WAL mode), Pydantic |
 | 인증 | bcrypt + random token (JWT-free) |
 | 이미지 처리 | Pillow (사진 위 텍스트 합성 → 인쇄용 이미지 생성) |
 | API 연동 | Book Print API Python SDK (Sandbox) |
-| 알림 | 카카오톡 메시지 API (선택) |
 
 ---
 
@@ -248,7 +260,6 @@ PAID(20) → PDF_READY(25) → CONFIRMED(30) → IN_PRODUCTION(40)
 - 사진 위 자유 드로잉 (Canvas API) — 화살표, 동그라미 등 그리기
 - AI 기반 사진 분석 — EXIF + Vision API로 자동 제목/목차 생성
 - 실시간 협업 — WebSocket으로 다른 참여자의 작성 현황 실시간 표시
-- 날짜별 갤러리 페이지 — rowGallery 템플릿으로 같은 날짜 사진 자동 배치
 - 다중 레이아웃 선택 — 1사진/2사진/콜라주 등 페이지별 레이아웃 선택
 
 ---
@@ -260,12 +271,12 @@ PAID(20) → PDF_READY(25) → CONFIRMED(30) → IN_PRODUCTION(40)
 │   ├── app/
 │   │   ├── main.py              # FastAPI 앱 + CORS + 정적 파일 서빙
 │   │   ├── database.py          # SQLite + WAL mode
-│   │   ├── models.py            # User, Trip, Page, Zone, Message, WebhookLog, AuditLog
+│   │   ├── models.py            # User, Trip, TripDay, Page, Zone, Message, WebhookLog, AuditLog
 │   │   ├── schemas.py           # Pydantic 요청/응답 스키마
-│   │   ├── seed.py              # 더미 데이터 (데모 계정 + 제주도 3박4일)
+│   │   ├── seed.py              # 더미 데이터 (데모 계정 + 제주도 2박3일)
 │   │   ├── routes/
-│   │   │   ├── auth.py          # 회원가입/로그인 + 카카오 OAuth
-│   │   │   ├── trips.py         # 여행 CRUD + 상태 전환
+│   │   │   ├── auth.py          # 회원가입/로그인
+│   │   │   ├── trips.py         # 여행 CRUD + 상태 전환 + Day 관리 + 표지 설정
 │   │   │   ├── pages.py         # 사진 업로드 + 존 자동 생성
 │   │   │   ├── messages.py      # 존 선점 + 메시지 작성/수정/삭제
 │   │   │   ├── books.py         # Sweetbook API (finalize + order + cancel + shipping)
@@ -274,8 +285,7 @@ PAID(20) → PDF_READY(25) → CONFIRMED(30) → IN_PRODUCTION(40)
 │   │   └── services/
 │   │       ├── sweetbook.py     # Book Print API 통신
 │   │       ├── image.py         # Pillow 이미지 합성
-│   │       ├── audit.py         # 감사 로그 기록
-│   │       └── kakao.py         # 카카오톡 알림
+│   │       └── audit.py         # 감사 로그 기록
 │   └── requirements.txt
 ├── frontend/
 │   └── src/
