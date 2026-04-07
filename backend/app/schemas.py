@@ -9,8 +9,8 @@ from datetime import datetime
 class TripCreate(BaseModel):
     title: str = Field(..., max_length=200)
     destination: str = Field(..., max_length=200)
-    start_date: str | None = None
-    end_date: str | None = None
+    start_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class TripResponse(BaseModel):
@@ -55,12 +55,40 @@ class StatusUpdate(BaseModel):
 class PageResponse(BaseModel):
     id: str
     page_number: int
+    day_order: int | None = None
     photo_url: str
     caption: str | None
     subtitle: str | None
     zones: list["ZoneResponse"] = []
 
     model_config = {"from_attributes": True}
+
+
+# --- TripDay ---
+
+class TripDayResponse(BaseModel):
+    id: str
+    day_number: int
+    title: str | None
+    date: str | None
+    description: str | None
+    pages: list[PageResponse] = []
+
+    model_config = {"from_attributes": True}
+
+
+class TripDayUpdate(BaseModel):
+    title: str | None = Field(None, max_length=200)
+    description: str | None = None
+
+
+class MovePageRequest(BaseModel):
+    target_day_id: str
+    position: int | None = None  # null = 맨 뒤에 추가
+
+
+class CoverRequest(BaseModel):
+    page_id: str | None = None  # 기존 페이지 사진을 표지로
 
 
 # --- Zone ---

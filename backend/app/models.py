@@ -56,6 +56,23 @@ class Trip(Base):
 
     owner = relationship("User", back_populates="trips")
     pages = relationship("Page", back_populates="trip", order_by="Page.page_number")
+    days = relationship("TripDay", back_populates="trip", order_by="TripDay.day_number")
+
+
+class TripDay(Base):
+    """여행 Day — Trip 내 날짜별 구분 단위"""
+    __tablename__ = "trip_days"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    trip_id = Column(String, ForeignKey("trips.id"), nullable=False)
+    day_number = Column(Integer, nullable=False)  # 1, 2, 3, ...
+    title = Column(String(200), nullable=True)     # "제주 첫째 날" 등
+    date = Column(String(10), nullable=True)       # "2026-04-03" (계산됨)
+    description = Column(Text, nullable=True)       # Day 간지에 표시할 설명
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    trip = relationship("Trip", back_populates="days")
+    pages = relationship("Page", back_populates="trip_day", order_by="Page.day_order")
 
 
 class Page(Base):
@@ -64,13 +81,16 @@ class Page(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     trip_id = Column(String, ForeignKey("trips.id"), nullable=False)
+    trip_day_id = Column(String, ForeignKey("trip_days.id"), nullable=True)
     page_number = Column(Integer, nullable=False)
+    day_order = Column(Integer, nullable=True)  # Day 내에서의 순서 (1, 2, 3...)
     photo_url = Column(String, nullable=False)  # backend/uploads/ 상대경로
     caption = Column(String(200), nullable=True)  # 주최자 캡션
     subtitle = Column(String(100), nullable=True)  # AI 생성 소제목
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     trip = relationship("Trip", back_populates="pages")
+    trip_day = relationship("TripDay", back_populates="pages")
     zones = relationship("Zone", back_populates="page", order_by="Zone.zone_number")
 
 

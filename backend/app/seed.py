@@ -25,42 +25,35 @@ from PIL import Image, ImageDraw, ImageFont
 import bcrypt
 
 from backend.app.database import SessionLocal, engine, Base
-from backend.app.models import Trip, Page, Zone, Message, User
+from backend.app.models import Trip, TripDay, Page, Zone, Message, User
 from backend.app.services.image import UPLOAD_DIR
 
 
 DUMMY_IMAGE_DIR = project_root / "dummy-data" / "images"
 
 JEJU_PHOTOS = [
-    {"subtitle": "Day 1 — 제주공항 도착", "caption": "드디어 제주도!", "color": "#45B7D1", "image": "IMG_1564.JPG"},
-    {"subtitle": "Day 1 — 한라산 등반", "caption": "한라산 백록담", "color": "#96CEB4", "image": "IMG_1567.jpg"},
-    {"subtitle": "Day 2 — 성산일출봉", "caption": "일출의 감동", "color": "#FF6B6B", "image": "IMG_1568.jpg"},
-    {"subtitle": "Day 2 — 섭지코지", "caption": "바다와 바람", "color": "#4ECDC4", "image": "IMG_1569.jpg"},
-    {"subtitle": "Day 3 — 우도", "caption": "에메랄드빛 바다", "color": "#FFEAA7", "image": "IMG_1570.jpg"},
-    {"subtitle": "Day 3 — 흑돼지 맛집", "caption": "제주 흑돼지!", "color": "#DDA0DD"},
-    {"subtitle": "Day 4 — 카페 투어", "caption": "감성 카페", "color": "#F7DC6F"},
-    {"subtitle": "Day 4 — 공항 귀환", "caption": "또 오자, 제주!", "color": "#85C1E9"},
+    {"subtitle": "공항에서 출발!", "caption": "드디어 제주도!", "color": "#45B7D1", "image": "airport_selfie.jpg"},
+    {"subtitle": "바다 앞에서", "caption": "바람이 시원해", "color": "#96CEB4", "image": "ocean_friends.jpg"},
+    {"subtitle": "카페에서 건배", "caption": "칵테일 타임", "color": "#FF6B6B", "image": "cafe_cheers.jpg"},
+    {"subtitle": "들판에서 점프!", "caption": "자유다!", "color": "#4ECDC4", "image": "field_jump.jpg"},
+    {"subtitle": "숙소에서 야식", "caption": "파자마 파티", "color": "#FFEAA7", "image": "hotel_night.jpg"},
+    {"subtitle": "공항에서 귀환", "caption": "또 오자, 제주!", "color": "#85C1E9", "image": "airport_return.jpg"},
 ]
 
 MESSAGES = [
     # (page_index, zone_number, author_name, content, color, pos_x, pos_y)
-    (0, 1, "영희", "공항에서 렌트카 타자마자 신났던 기억! 🚗", "#FFD700", 72, 20),
+    (0, 1, "영희", "공항에서 셀카 찍자마자 신났던 기억!", "#FFD700", 72, 20),
     (0, 3, "철수", "비행기에서 본 제주 바다가 진짜 예뻤어", "#FFFFFF", 50, 50),
-    (1, 1, "민정", "한라산 올라갈 때 다리 아팠지만 정상 뷰가 최고였어", "#7FDBFF", 70, 15),
-    (1, 2, "영희", "백록담에서 단체사진 찍은 거 기억나? ㅋㅋ", "#2ECC40", 30, 80),
-    (1, 3, "철수", "중간에 포기하고 싶었는데 같이 올라가서 다행이야", "#FFFFFF", 50, 50),
-    (2, 1, "철수", "새벽 4시에 일어나서 힘들었지만 일출 보고 감동", "#FFD700", 25, 25),
-    (2, 3, "민정", "여기서 영희가 감동받아서 울었잖아 ㅎㅎ", "#FFFFFF", 50, 50),
-    (3, 2, "영희", "바람 엄청 불었는데 머리 다 날려서 사진 망했어 😂", "#FF6B6B", 75, 75),
-    (3, 4, "민정", "섭지코지 걷는 내내 힐링이었어 또 가고 싶다", "#FFFFFF", 50, 50),
-    (4, 1, "민정", "우도 자전거 탈 때가 제일 재밌었어!", "#2ECC40", 70, 20),
-    (4, 3, "영희", "땅콩 아이스크림은 꼭 먹어야 해 진짜 맛있어", "#FFFFFF", 50, 50),
-    (5, 1, "철수", "흑돼지 3인분 시켰는데 다 먹었지 ㅋㅋㅋ", "#FF851B", 25, 15),
-    (5, 2, "영희", "소주 4병 마신 건 비밀로 하자...", "#FFAFD8", 75, 80),
-    (6, 1, "민정", "카페 뷰가 진짜 미쳤어 사진 100장은 찍은 듯", "#FFD700", 70, 25),
-    (7, 1, "영희", "다음엔 겨울에 가자! 눈 오는 한라산 보고 싶어", "#7FDBFF", 30, 20),
-    (7, 3, "철수", "최고의 여행이었어. 다음에 또 가자!", "#FFFFFF", 50, 50),
-    (7, 4, "민정", "우리 넷이서 가는 여행은 항상 최고야 ❤️", "#FFFFFF", 50, 50),
+    (1, 1, "민정", "바람 불어서 머리 날리는 것도 좋았어", "#7FDBFF", 70, 15),
+    (1, 2, "영희", "여기서 단체사진 찍은 거 기억나? ㅋㅋ", "#2ECC40", 30, 80),
+    (2, 1, "철수", "칵테일 색깔이 진짜 예뻤어!", "#FFD700", 25, 25),
+    (2, 3, "민정", "카페 분위기 최고였어 또 가고 싶다", "#FFFFFF", 50, 50),
+    (3, 1, "영희", "점프샷 타이밍 맞추느라 10번은 뛴 듯 😂", "#FF6B6B", 75, 25),
+    (3, 3, "철수", "여기 들판이 진짜 넓어서 뛰어다니기 좋았어", "#FFFFFF", 50, 50),
+    (4, 1, "민정", "파자마 파티가 제일 재밌었어!", "#2ECC40", 70, 20),
+    (4, 3, "영희", "과자 다 먹고 새벽까지 수다 떨었지", "#FFFFFF", 50, 50),
+    (5, 1, "철수", "벌써 돌아가다니... 다음에 또 오자!", "#7FDBFF", 30, 20),
+    (5, 3, "민정", "최고의 여행이었어. 우리 우정 영원해 ❤️", "#FFFFFF", 50, 50),
 ]
 
 
@@ -108,10 +101,10 @@ def seed():
 
         # Create trip
         trip = Trip(
-            title="제주도 3박4일",
+            title="제주도 2박3일",
             destination="제주도",
             start_date="2026-04-01",
-            end_date="2026-04-04",
+            end_date="2026-04-03",
             user_id=user.id,
         )
         db.add(trip)
@@ -120,21 +113,39 @@ def seed():
         # Change status to collecting
         trip.status = "collecting"
 
-        print(f"🏝️  여행 생성: {trip.title}")
+        # Create TripDays (3일 — 2박3일)
+        day_dates = ["2026-04-01", "2026-04-02", "2026-04-03"]
+        day_titles = ["출발 + 바다", "카페 + 들판", "숙소 + 귀환"]
+        trip_days = []
+        for i, (d_date, d_title) in enumerate(zip(day_dates, day_titles)):
+            td = TripDay(
+                trip_id=trip.id,
+                day_number=i + 1,
+                date=d_date,
+                title=d_title,
+            )
+            db.add(td)
+            db.flush()
+            trip_days.append(td)
+
+        print(f"🏝️  여행 생성: {trip.title} ({len(trip_days)}일)")
         print(f"   ID: {trip.id}")
         print(f"   Admin Token: {trip.admin_token}")
         print(f"   Share Token: {trip.share_token}")
+
+        # 사진별 Day 배치 (2장씩, 6장 / 3 Days)
+        photo_to_day = [0, 0, 1, 1, 2, 2]
 
         # Create pages with photos
         trip_dir = UPLOAD_DIR / trip.id
         trip_dir.mkdir(parents=True, exist_ok=True)
 
         pages = []
+        day_order_counters = [0, 0, 0]
         for i, photo_data in enumerate(JEJU_PHOTOS):
             filename = f"page_{i+1}_jeju.jpg"
             filepath = trip_dir / filename
 
-            # 실제 더미 이미지가 있으면 복사, 없으면 생성
             real_image = DUMMY_IMAGE_DIR / photo_data.get("image", "") if photo_data.get("image") else None
             if real_image and real_image.exists():
                 import shutil
@@ -146,9 +157,14 @@ def seed():
                     photo_data["color"],
                 )
 
+            day_idx = photo_to_day[i]
+            day_order_counters[day_idx] += 1
+
             page = Page(
                 trip_id=trip.id,
+                trip_day_id=trip_days[day_idx].id,
                 page_number=i + 1,
+                day_order=day_order_counters[day_idx],
                 photo_url=f"/uploads/{trip.id}/{filename}",
                 caption=photo_data["caption"],
                 subtitle=photo_data["subtitle"],
@@ -188,6 +204,11 @@ def seed():
                 position_y=py,
             )
             db.add(message)
+
+        # 첫 번째 사진을 표지로 설정
+        if pages:
+            trip.cover_image = pages[0][0].photo_url
+            print(f"  🖼️  표지 설정: {pages[0][0].photo_url}")
 
         db.commit()
 

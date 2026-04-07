@@ -19,9 +19,19 @@ export interface Trip {
   zone_stats: { total: number; claimed: number };
 }
 
+export interface TripDay {
+  id: string;
+  day_number: number;
+  title: string | null;
+  date: string | null;
+  description: string | null;
+  pages: Page[];
+}
+
 export interface Page {
   id: string;
   page_number: number;
+  day_order: number | null;
   photo_url: string;
   caption: string | null;
   subtitle: string | null;
@@ -178,9 +188,11 @@ export async function uploadPagesBulk(
   tripId: string,
   photos: File[],
   adminToken: string,
+  tripDayId?: string,
 ): Promise<{ created: number; pages: any[] }> {
   const form = new FormData();
   photos.forEach((p) => form.append('photos', p));
+  if (tripDayId) form.append('trip_day_id', tripDayId);
   const res = await fetch(`${BASE}/api/trips/${tripId}/pages/bulk`, {
     method: 'POST',
     headers: adminHeaders(adminToken),
@@ -208,6 +220,59 @@ export async function reorderPages(
     method: 'PATCH',
     headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
     body: JSON.stringify({ page_ids: pageIds }),
+  });
+  return handleResponse(res);
+}
+
+// --- Days ---
+
+export async function getDays(
+  tripId: string,
+  token: string,
+  isAdmin: boolean,
+): Promise<{ days: TripDay[] }> {
+  const headers = isAdmin ? adminHeaders(token) : shareHeaders(token);
+  const res = await fetch(`${BASE}/api/trips/${tripId}/days`, { headers });
+  return handleResponse(res);
+}
+
+export async function updateDay(
+  tripId: string,
+  dayId: string,
+  adminToken: string,
+  data: { title?: string; description?: string },
+): Promise<void> {
+  const res = await fetch(`${BASE}/api/trips/${tripId}/days/${dayId}`, {
+    method: 'PATCH',
+    headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(res);
+}
+
+export async function movePage(
+  pageId: string,
+  adminToken: string,
+  targetDayId: string,
+  position?: number,
+): Promise<void> {
+  const res = await fetch(`${BASE}/api/pages/${pageId}/move`, {
+    method: 'PATCH',
+    headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_day_id: targetDayId, position }),
+  });
+  return handleResponse(res);
+}
+
+export async function setCover(
+  tripId: string,
+  adminToken: string,
+  pageId: string,
+): Promise<void> {
+  const res = await fetch(`${BASE}/api/trips/${tripId}/cover`, {
+    method: 'PATCH',
+    headers: { ...adminHeaders(adminToken), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ page_id: pageId }),
   });
   return handleResponse(res);
 }

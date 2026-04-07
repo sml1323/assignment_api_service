@@ -52,11 +52,19 @@ def get_client() -> Client:
 
 
 def build_tripbook(trip, pages_with_messages, cover_path: str | None = None) -> dict:
-    """Build a complete trip photobook.
+    """Build a complete trip photobook with Day-based structure.
+
+    Day 기반 앨범 구조:
+    1. 표지 (cover) — 콘텐츠 페이지에 포함 안 됨
+    2. Day별 순회 (사진이 있는 Day만):
+       a. Day 간지 페이지 (CONTENT_B 템플릿)
+       b. 사진 페이지들 (day_order 순)
+       c. 텍스트 페이지 (bottom zone 메시지가 있는 경우)
+    3. 패딩: target = max(24, ceil_to_even(page_count))
 
     Args:
-        trip: Trip model instance
-        pages_with_messages: list of (Page, composite_photo_path, bottom_text)
+        trip: Trip model instance (with days relationship loaded)
+        pages_with_messages: dict of {page_id: (Page, composite_photo_path, bottom_text)}
         cover_path: path to cover image file
 
     Returns: {"book_uid": str, "page_count": int}
@@ -73,25 +81,24 @@ def build_tripbook(trip, pages_with_messages, cover_path: str | None = None) -> 
 
     # 2. Upload all photos
     photo_names = {}
-    for page, composite_path, _ in pages_with_messages:
+    for page_id, (page, composite_path, _) in pages_with_messages.items():
         upload_result = client.photos.upload(book_uid, composite_path)
-        photo_names[page.id] = upload_result["data"]["fileName"]
+        photo_names[page_id] = upload_result["data"]["fileName"]
 
-    # 3. Cover (구글포토북C 테마)
+    # 3. Cover
     if cover_path and Path(cover_path).exists():
         cover_upload = client.photos.upload(book_uid, cover_path)
         cover_photo_name = cover_upload["data"]["fileName"]
     else:
-        first_page = pages_with_messages[0] if pages_with_messages else None
-        cover_photo_name = photo_names.get(first_page[0].id, "") if first_page else ""
+        # 첫 번째 Day의 첫 번째 사진을 표지로
+        first_page_id = None
+        for day in sorted(trip.days, key=lambda d: d.day_number):
+            if day.pages:
+                first_page_id = sorted(day.pages, key=lambda p: p.day_order or 0)[0].id
+                break
+        cover_photo_name = photo_names.get(first_page_id, "") if first_page_id else ""
 
-    page_count = 0
-
-    date_range = ""
-    if trip.start_date and trip.end_date:
-        date_range = f"{trip.start_date} - {trip.end_date}"
-    elif trip.start_date:
-        date_range = trip.start_date
+    date_range = f"{trip.start_date} - {trip.end_date}" if trip.start_date and trip.end_date else trip.start_date or ""
 
     client.covers.create(
         book_uid,
@@ -103,52 +110,70 @@ def build_tripbook(trip, pages_with_messages, cover_path: str | None = None) -> 
         },
     )
 
-    # 3.5. Month header as section divider
-    if trip.start_date:
-        month_label = _format_month_label(trip.start_date)
+    page_count = 0
+
+    # 4. Day별 순회
+    for day in sorted(trip.days, key=lambda d: d.day_number):
+        day_pages = sorted(day.pages, key=lambda p: p.day_order or 0)
+        if not day_pages:
+            continue  # 사진 없는 Day는 간지 삽입 생략
+
+        # 4a. Day 간지 페이지
+        try:
+            day_date_parts = day.date.split("-") if day.date else []
+            month_num = day_date_parts[1] if len(day_date_parts) > 1 else "01"
+            day_num = day_date_parts[2] if len(day_date_parts) > 2 else "01"
+        except (IndexError, ValueError):
+            month_num, day_num = "01", "01"
+
         client.contents.insert(
             book_uid,
-            template_uid=MONTH_HEADER_TEMPLATE,
-            parameters={"monthYearLabel": month_label},
-            break_before="page",
-        )
-        page_count += 1
-
-    # 4. Content pages
-    for page, _, bottom_text in pages_with_messages:
-        photo_name = photo_names.get(page.id, "")
-
-        # Photo page (with composite overlay text baked in)
-        client.contents.insert(
-            book_uid,
-            template_uid=CONTENT_PHOTO_TEMPLATE,
+            template_uid=CONTENT_B_TEMPLATE,
             parameters={
-                "dayLabel": page.subtitle or f"Page {page.page_number}",
-                "photo": photo_name,
+                "monthNum": month_num,
+                "dayNum": day_num,
+                "diaryText": day.description or day.title or f"Day {day.day_number}",
             },
             break_before="page",
         )
         page_count += 1
 
-        # Text page for bottom zone messages
-        if bottom_text:
-            date_parts = (trip.start_date or "01-01").split("-")
-            month = date_parts[1] if len(date_parts) > 1 else "01"
-            day = str(page.page_number).zfill(2)
+        # 4b. 사진 페이지들
+        for page in day_pages:
+            page_data = pages_with_messages.get(page.id)
+            if not page_data:
+                continue
+            _, _, bottom_text = page_data
+            photo_name = photo_names.get(page.id, "")
+
             client.contents.insert(
                 book_uid,
-                template_uid=CONTENT_B_TEMPLATE,
+                template_uid=CONTENT_PHOTO_TEMPLATE,
                 parameters={
-                    "monthNum": month,
-                    "dayNum": day,
-                    "diaryText": bottom_text,
+                    "dayLabel": page.subtitle or day.title or f"Day {day.day_number}",
+                    "photo": photo_name,
                 },
                 break_before="page",
             )
             page_count += 1
 
-    # 5. Pad to minimum 24 pages
-    while page_count < MIN_PAGES:
+            # 4c. 텍스트 페이지 (bottom zone 메시지)
+            if bottom_text:
+                client.contents.insert(
+                    book_uid,
+                    template_uid=CONTENT_B_TEMPLATE,
+                    parameters={
+                        "monthNum": month_num,
+                        "dayNum": day_num,
+                        "diaryText": bottom_text,
+                    },
+                    break_before="page",
+                )
+                page_count += 1
+
+    # 5. 패딩: target = max(24, ceil_to_even(page_count))
+    target = max(MIN_PAGES, page_count + (page_count % 2))
+    while page_count < target:
         client.contents.insert(
             book_uid,
             template_uid=BLANK_TEMPLATE,

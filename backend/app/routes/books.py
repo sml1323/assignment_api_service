@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Trip, Page, Zone, Message
+from ..models import Trip, TripDay, Page, Zone, Message
 from ..schemas import OrderCreate, OrderCancelRequest, ShippingUpdate
 from ..services.sweetbook import (
     build_tripbook, estimate_order, create_order, get_order,
@@ -45,12 +45,24 @@ def finalize_book(
     if trip.status != "collecting":
         raise HTTPException(422, "collecting 상태에서만 확정할 수 있습니다")
 
-    pages = db.query(Page).filter(Page.trip_id == trip_id).order_by(Page.page_number).all()
+    # Day가 있는 페이지만 가져오기
+    pages = (
+        db.query(Page)
+        .filter(Page.trip_id == trip_id, Page.trip_day_id.isnot(None))
+        .all()
+    )
     if not pages:
-        raise HTTPException(422, "페이지가 없습니다")
+        raise HTTPException(422, "Day에 배치된 사진이 없습니다")
+
+    # page_number 재계산 (Day 순서 기반)
+    page_num = 1
+    for day in sorted(trip.days, key=lambda d: d.day_number):
+        for page in sorted(day.pages, key=lambda p: p.day_order or 0):
+            page.page_number = page_num
+            page_num += 1
 
     # Build composite photos and collect bottom text
-    pages_data = []
+    pages_data = {}
     for page in pages:
         zones = db.query(Zone).filter(Zone.page_id == page.id).order_by(Zone.zone_number).all()
 
@@ -84,7 +96,7 @@ def finalize_book(
                 bottom_parts.append(f"{z.message.author_name}: {z.message.content}")
         bottom_text = "\n\n".join(bottom_parts) if bottom_parts else ""
 
-        pages_data.append((page, composite_path, bottom_text))
+        pages_data[page.id] = (page, composite_path, bottom_text)
 
     # Cover image
     cover_path = None

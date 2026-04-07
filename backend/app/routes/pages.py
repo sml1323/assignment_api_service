@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Header, UploadFile, File,
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Trip, Page, Zone
-from ..schemas import PageResponse
+from ..models import Trip, TripDay, Page, Zone
+from ..schemas import PageResponse, MovePageRequest
 from ..services.audit import log_action
 
 router = APIRouter(prefix="/api", tags=["pages"])
@@ -80,15 +80,37 @@ def add_page(
 def add_pages_bulk(
     trip_id: str,
     photos: list[UploadFile] = File(...),
+    trip_day_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     x_admin_token: str = Header(...),
 ):
-    """사진 일괄 업로드 — 한 번에 여러 사진을 페이지로 변환"""
+    """사진 일괄 업로드 — Day에 배치 (trip_day_id 필수 권장)"""
     trip = require_admin(trip_id, db, x_admin_token)
+
+    if trip.status not in ("draft", "collecting"):
+        raise HTTPException(422, "확정된 여행에는 사진을 추가할 수 없습니다")
+
+    # Day 검증
+    target_day = None
+    if trip_day_id:
+        target_day = db.query(TripDay).filter(
+            TripDay.id == trip_day_id, TripDay.trip_id == trip_id
+        ).first()
+        if not target_day:
+            raise HTTPException(404, "Day를 찾을 수 없습니다")
 
     current_count = db.query(Page).filter(Page.trip_id == trip_id).count()
     if current_count + len(photos) > MAX_PAGES:
         raise HTTPException(422, f"페이지 수가 최대({MAX_PAGES})를 초과합니다")
+
+    # Day 내 현재 최대 day_order
+    current_day_order = 0
+    if target_day:
+        max_order = db.query(Page.day_order).filter(
+            Page.trip_day_id == trip_day_id
+        ).order_by(Page.day_order.desc()).first()
+        if max_order and max_order[0]:
+            current_day_order = max_order[0]
 
     trip_dir = UPLOADS_DIR / trip_id
     trip_dir.mkdir(exist_ok=True)
@@ -104,7 +126,9 @@ def add_pages_bulk(
         photo_url = f"/uploads/{trip_id}/{filename}"
         page = Page(
             trip_id=trip_id,
+            trip_day_id=trip_day_id,
             page_number=page_num,
+            day_order=current_day_order + i + 1 if target_day else None,
             photo_url=photo_url,
         )
         db.add(page)
@@ -187,3 +211,67 @@ def update_page(
 
     db.commit()
     return {"ok": True}
+
+
+@router.patch("/pages/{page_id}/move")
+def move_page(
+    page_id: str,
+    body: MovePageRequest,
+    db: Session = Depends(get_db),
+    x_admin_token: str = Header(...),
+):
+    """사진을 다른 Day로 이동"""
+    page = db.query(Page).filter(Page.id == page_id).first()
+    if not page:
+        raise HTTPException(404, "페이지를 찾을 수 없습니다")
+
+    trip = db.query(Trip).filter(Trip.id == page.trip_id).first()
+    if trip.admin_token != x_admin_token:
+        raise HTTPException(403, "관리자 권한이 없습니다")
+
+    if trip.status not in ("draft", "collecting"):
+        raise HTTPException(422, "확정된 여행의 사진은 이동할 수 없습니다")
+
+    # 대상 Day 검증
+    target_day = db.query(TripDay).filter(
+        TripDay.id == body.target_day_id, TripDay.trip_id == trip.id
+    ).first()
+    if not target_day:
+        raise HTTPException(404, "대상 Day를 찾을 수 없습니다")
+
+    # 원래 Day에서 제거 후 day_order 재정렬
+    if page.trip_day_id:
+        old_siblings = (
+            db.query(Page)
+            .filter(Page.trip_day_id == page.trip_day_id, Page.id != page.id)
+            .order_by(Page.day_order)
+            .all()
+        )
+        for idx, sibling in enumerate(old_siblings):
+            sibling.day_order = idx + 1
+
+    # 대상 Day에 삽입
+    target_pages = (
+        db.query(Page)
+        .filter(Page.trip_day_id == body.target_day_id)
+        .order_by(Page.day_order)
+        .all()
+    )
+
+    if body.position is not None and 1 <= body.position <= len(target_pages) + 1:
+        insert_pos = body.position
+    else:
+        insert_pos = len(target_pages) + 1
+
+    page.trip_day_id = body.target_day_id
+    page.day_order = insert_pos
+
+    # 기존 페이지들 밀기
+    for p in target_pages:
+        if p.day_order and p.day_order >= insert_pos:
+            p.day_order += 1
+
+    log_action(db, "page.move", "admin", trip_id=trip.id, target=page_id,
+               detail={"to_day": target_day.day_number, "position": insert_pos})
+    db.commit()
+    return {"ok": True, "day_id": body.target_day_id, "day_order": insert_pos}

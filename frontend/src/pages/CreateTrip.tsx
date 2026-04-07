@@ -19,6 +19,14 @@ export default function CreateTrip() {
       setError('여행 제목과 목적지를 입력해주세요');
       return;
     }
+    if (!form.start_date || !form.end_date) {
+      setError('출발일과 도착일을 입력해주세요');
+      return;
+    }
+    if (form.end_date < form.start_date) {
+      setError('도착일은 출발일 이후여야 합니다');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -85,27 +93,42 @@ export default function CreateTrip() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
-                시작일
+                출발일 *
               </label>
               <input
                 type="date"
                 value={form.start_date}
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
                 className={inputClass}
+                required
               />
             </div>
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
-                종료일
+                도착일 *
               </label>
               <input
                 type="date"
                 value={form.end_date}
                 onChange={(e) => setForm({ ...form, end_date: e.target.value })}
                 className={inputClass}
+                required
               />
             </div>
           </div>
+
+          {/* Day count preview */}
+          {form.start_date && form.end_date && form.end_date >= form.start_date && (() => {
+            const start = new Date(form.start_date);
+            const end = new Date(form.end_date);
+            const nights = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            const numDays = nights + 1;
+            return (
+              <div className="bg-orange-50 rounded-xl px-4 py-3 text-sm text-orange-700">
+                {nights}박 {numDays}일 · Day 1~{numDays} 자동 생성
+              </div>
+            );
+          })()}
 
           {error && <p className="text-sm text-red-500 px-1">{error}</p>}
 

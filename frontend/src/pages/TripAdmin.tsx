@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { getTrip, getPages, uploadPagesBulk, updateTripStatus, finalizeBook, reorderPages, getAuditLog, getOrderStatus, getCreditBalance, getCreditTransactions, sandboxCharge } from '../lib/api';
-import type { Trip, Page, AuditEntry } from '../lib/api';
+import { getTrip, getPages, getDays, uploadPagesBulk, updateTripStatus, finalizeBook, getAuditLog, getOrderStatus, getCreditBalance, getCreditTransactions, sandboxCharge, updateDay, movePage, setCover } from '../lib/api';
+import type { Trip, Page, TripDay, AuditEntry } from '../lib/api';
 
 const statusLabels: Record<string, string> = {
   draft: '초안',
@@ -21,19 +21,25 @@ export default function TripAdmin() {
   const { tripId } = useParams<{ tripId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const _fileRef = useRef<HTMLInputElement>(null); void _fileRef;
 
   const adminToken = searchParams.get('token') || localStorage.getItem(`trip_admin_${tripId}`) || '';
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
+  const [days, setDays] = useState<TripDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadingDayId, setUploadingDayId] = useState<string | null>(null);
   const [finalizing, setFinalizing] = useState(false);
-  const [tab, setTab] = useState<'pages' | 'status' | 'order' | 'credits'>('pages');
+  const [tab, setTab] = useState<'album' | 'status' | 'order' | 'credits'>('album');
   const [copied, setCopied] = useState(false);
-  const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [_expandedPage, _setExpandedPage] = useState<string | null>(null); void _expandedPage; void _setExpandedPage;
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const [movingTo, setMovingTo] = useState<string | null>(null);
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [orderDetail, setOrderDetail] = useState<any>(null);
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
@@ -52,17 +58,20 @@ export default function TripAdmin() {
   const loadData = async () => {
     if (!tripId || !adminToken) return;
     try {
-      const [t, p] = await Promise.all([
+      const [t, p, daysRes] = await Promise.allSettled([
         getTrip(tripId, adminToken),
         getPages(tripId, adminToken, true),
+        getDays(tripId, adminToken, true),
       ]);
-      setTrip(t);
-      setPages(p);
+      if (t.status === 'fulfilled') setTrip(t.value);
+      if (p.status === 'fulfilled') setPages(p.value);
+      if (daysRes.status === 'fulfilled') setDays(daysRes.value.days);
       try {
         const audit = await getAuditLog(tripId, adminToken);
         setAuditLog(audit);
       } catch {}
-      if (t.status === 'ordered' && t.sweetbook_order_uid) {
+      const tripData = t.status === 'fulfilled' ? t.value : null;
+      if (tripData?.status === 'ordered' && tripData?.sweetbook_order_uid) {
         try {
           const od = await getOrderStatus(tripId, adminToken);
           setOrderDetail(od);
@@ -75,17 +84,67 @@ export default function TripAdmin() {
     }
   };
 
-  const handleUpload = async (files: FileList) => {
+  const handleUpload = async (files: FileList, dayId?: string) => {
     if (!tripId) return;
     setUploading(true);
+    setUploadingDayId(dayId || null);
     try {
-      await uploadPagesBulk(tripId, Array.from(files), adminToken);
+      await uploadPagesBulk(tripId, Array.from(files), adminToken, dayId);
       await loadData();
     } catch (err: any) {
       setError(err.message);
     } finally {
       setUploading(false);
+      setUploadingDayId(null);
     }
+  };
+
+  const handleMovePage = async (pageId: string, targetDayId: string) => {
+    if (!tripId) return;
+    try {
+      await movePage(pageId, adminToken, targetDayId);
+      setSelectedPages(new Set());
+      setMovingTo(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleMoveSelected = async (targetDayId: string) => {
+    for (const pageId of selectedPages) {
+      await handleMovePage(pageId, targetDayId);
+    }
+  };
+
+  const handleSetCover = async (pageId: string) => {
+    if (!tripId) return;
+    try {
+      await setCover(tripId, adminToken, pageId);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleDayTitleSave = async (dayId: string) => {
+    if (!tripId) return;
+    try {
+      await updateDay(tripId, dayId, adminToken, { title: editTitle });
+      setEditingDay(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const togglePageSelection = (pageId: string) => {
+    setSelectedPages(prev => {
+      const next = new Set(prev);
+      if (next.has(pageId)) next.delete(pageId);
+      else next.add(pageId);
+      return next;
+    });
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -144,7 +203,7 @@ export default function TripAdmin() {
   }
 
   const tabItems = [
-    { key: 'pages' as const, label: '페이지' },
+    { key: 'album' as const, label: '앨범' },
     { key: 'status' as const, label: '참여' },
     { key: 'order' as const, label: '주문' },
     { key: 'credits' as const, label: '충전금' },
@@ -232,154 +291,216 @@ export default function TripAdmin() {
           </div>
         )}
 
-        {/* Pages Tab */}
-        {tab === 'pages' && (
+        {/* Album Tab */}
+        {tab === 'album' && (
           <div className="space-y-4">
-            {trip.status === 'draft' && (
-              <>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => e.target.files && handleUpload(e.target.files)}
-                />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full py-10 border-2 border-dashed border-gray-200 hover:border-orange-300
-                             rounded-2xl text-gray-400 hover:text-orange-500 transition-all duration-200
-                             flex flex-col items-center gap-2"
-                >
-                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                  </svg>
-                  <span className="text-sm font-medium">{uploading ? '업로드 중...' : '사진 일괄 업로드'}</span>
-                </button>
-              </>
-            )}
+            {/* Cover Section */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">표지</p>
+              {trip.cover_image ? (
+                <div className="flex items-center gap-4">
+                  <img src={trip.cover_image} alt="표지" className="w-24 h-16 object-cover rounded-xl" />
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-600">표지 사진 설정됨</p>
+                    <p className="text-xs text-gray-400 mt-0.5">아래 사진에서 다른 사진을 선택할 수도 있어요</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-400">표지 사진을 선택하세요</p>
+                  <p className="text-xs text-gray-300">아래 Day 사진에 마우스를 올려 "표지로" 버튼을 누르거나, 직접 업로드하세요</p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="cover-upload"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !tripId || !days[0]) return;
+                      // 표지 전용: 첫 번째 Day에 업로드 후 바로 표지로 설정
+                      try {
+                        const result = await uploadPagesBulk(tripId, [file], adminToken, days[0].id);
+                        if (result.pages[0]) {
+                          await setCover(tripId, adminToken, result.pages[0].id);
+                        }
+                        await loadData();
+                      } catch (err: any) {
+                        setError(err.message);
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="cover-upload"
+                    className="inline-block px-4 py-2 border border-gray-200 hover:border-orange-300
+                               rounded-xl text-sm text-gray-500 hover:text-orange-500 cursor-pointer
+                               transition-all duration-150"
+                  >
+                    사진 업로드
+                  </label>
+                </div>
+              )}
+            </div>
 
-            {pages.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-gray-300 text-sm">아직 페이지가 없습니다</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pages.map((page, idx) => {
-                  const claimedCount = page.zones.filter((z) => z.claimed_by).length;
-                  const isExpanded = expandedPage === page.id;
-                  return (
-                    <div key={page.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                      <div className="flex gap-3 p-3">
-                        {/* Reorder */}
-                        <div className="flex flex-col justify-center gap-0.5 flex-shrink-0">
-                          <button
-                            onClick={async () => {
-                              if (idx === 0) return;
-                              const ids = pages.map(p => p.id);
-                              [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-                              await reorderPages(tripId!, ids, adminToken);
-                              await loadData();
-                            }}
-                            disabled={idx === 0}
-                            className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:text-gray-200 text-xs transition-colors"
-                          >▲</button>
-                          <span className="text-[10px] text-gray-300 text-center font-medium">{idx + 1}</span>
-                          <button
-                            onClick={async () => {
-                              if (idx === pages.length - 1) return;
-                              const ids = pages.map(p => p.id);
-                              [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-                              await reorderPages(tripId!, ids, adminToken);
-                              await loadData();
-                            }}
-                            disabled={idx === pages.length - 1}
-                            className="w-6 h-6 flex items-center justify-center text-gray-300 hover:text-gray-600 disabled:text-gray-200 text-xs transition-colors"
-                          >▼</button>
-                        </div>
+            {/* Day Sections */}
+            {days.map((day) => {
+              const dayDate = day.date ? new Date(day.date + 'T00:00:00') : null;
+              const dayLabel = dayDate
+                ? `${dayDate.getMonth() + 1}/${dayDate.getDate()}(${['일','월','화','수','목','금','토'][dayDate.getDay()]})`
+                : '';
+              return (
+                <div key={day.id} className="space-y-2">
+                  {/* Day Header */}
+                  <div className="flex items-baseline gap-2 pt-2">
+                    <span className="text-base font-semibold text-gray-800">Day {day.day_number}</span>
+                    <span className="text-xs text-gray-400">{dayLabel}</span>
+                  </div>
 
-                        <img
-                          src={page.photo_url}
-                          alt={`Page ${page.page_number}`}
-                          className="w-20 h-16 object-cover rounded-xl flex-shrink-0 cursor-pointer"
-                          onClick={() => setExpandedPage(isExpanded ? null : page.id)}
-                        />
-                        <div
-                          className="flex-1 min-w-0 cursor-pointer"
-                          onClick={() => setExpandedPage(isExpanded ? null : page.id)}
-                        >
-                          <p className="text-sm font-medium text-gray-800 truncate">
-                            {page.subtitle || `Page ${page.page_number}`}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {claimedCount}/{page.zones.length} 작성됨
-                          </p>
-                          <div className="flex gap-1 mt-1.5">
-                            {page.zones.map((z) => (
-                              <div
-                                key={z.id}
-                                className={`w-1.5 h-1.5 rounded-full ${z.claimed_by ? 'bg-orange-400' : 'bg-gray-200'}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <svg
-                          className={`w-4 h-4 text-gray-300 self-center flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                          onClick={() => setExpandedPage(isExpanded ? null : page.id)}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
+                  {/* Day Title (inline edit) */}
+                  {editingDay === day.id ? (
+                    <div className="flex gap-2">
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleDayTitleSave(day.id)}
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200"
+                        autoFocus
+                      />
+                      <button onClick={() => handleDayTitleSave(day.id)} className="text-orange-500 text-sm font-medium">저장</button>
+                      <button onClick={() => setEditingDay(null)} className="text-gray-400 text-sm">취소</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingDay(day.id); setEditTitle(day.title || ''); }}
+                      className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {day.title || 'Day 제목 추가...'} <span className="text-gray-300 text-xs">편집</span>
+                    </button>
+                  )}
 
-                      {isExpanded && (
-                        <div className="border-t border-gray-100 px-4 pb-4 pt-3 space-y-2">
-                          {page.zones.map((zone) => (
-                            <div
-                              key={zone.id}
-                              className={`p-3 rounded-xl text-sm ${
-                                zone.message ? 'bg-orange-50' : 'bg-gray-50'
-                              }`}
-                            >
-                              <span className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Zone {zone.zone_number}</span>
-                              {zone.message ? (
-                                <div className="mt-1.5">
-                                  <p className="text-gray-700 leading-relaxed">{zone.message.content}</p>
-                                  <p className="text-xs text-gray-400 mt-1.5">— {zone.message.author_name}</p>
-                                </div>
-                              ) : (
-                                <p className="text-gray-300 mt-1 text-xs">비어있음</p>
+                  {/* Photo Grid */}
+                  {day.pages.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {day.pages.map((page) => {
+                        const isSelected = selectedPages.has(page.id);
+                        return (
+                          <div
+                            key={page.id}
+                            className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer group ${
+                              isSelected ? 'ring-2 ring-orange-500' : ''
+                            }`}
+                            onClick={() => togglePageSelection(page.id)}
+                          >
+                            <img src={page.photo_url} alt="" className="w-full h-full object-cover" />
+                            {/* Checkbox overlay */}
+                            <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'bg-orange-500 border-orange-500'
+                                : 'border-white/80 bg-black/20 opacity-0 group-hover:opacity-100'
+                            }`}>
+                              {isSelected && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            {/* Cover badge */}
+                            {trip.cover_image === page.photo_url && (
+                              <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">표지</div>
+                            )}
+                            {/* Set as cover (on hover) */}
+                            {trip.cover_image !== page.photo_url && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleSetCover(page.id); }}
+                                className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                표지로
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  ) : (
+                    <div className="text-center py-6 text-gray-300 text-sm">
+                      사진을 추가해보세요
+                    </div>
+                  )}
 
-            {pages.length > 0 && (
-              <div className="space-y-3 pt-2">
+                  {/* Per-day upload */}
+                  {(trip.status === 'draft' || trip.status === 'collecting') && (
+                    <>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        id={`upload-${day.id}`}
+                        className="hidden"
+                        onChange={(e) => e.target.files && handleUpload(e.target.files, day.id)}
+                      />
+                      <label
+                        htmlFor={`upload-${day.id}`}
+                        className="block w-full py-3 border-2 border-dashed border-gray-200 hover:border-orange-300
+                                   rounded-xl text-gray-400 hover:text-orange-500 text-center text-sm cursor-pointer
+                                   transition-all duration-150"
+                      >
+                        {uploading && uploadingDayId === day.id ? '업로드 중...' : '+ 사진 추가'}
+                      </label>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Bottom Actions */}
+            <div className="space-y-3 pt-2">
+              <button
+                onClick={() => navigate(`/trip/${tripId}/preview`)}
+                className="w-full py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50
+                           text-gray-600 rounded-xl font-medium transition-all duration-150"
+              >
+                미리보기
+              </button>
+
+              {trip.status === 'draft' && (
                 <button
-                  onClick={() => navigate(`/trip/${tripId}/preview`)}
-                  className="w-full py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50
-                             text-gray-600 rounded-xl font-medium transition-all duration-150"
+                  onClick={() => handleStatusChange('collecting')}
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
+                             text-white rounded-xl font-medium transition-all duration-150"
                 >
-                  미리보기
+                  참여자 초대 시작하기
                 </button>
+              )}
+            </div>
 
-                {trip.status === 'draft' && (
-                  <button
-                    onClick={() => handleStatusChange('collecting')}
-                    className="w-full py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.98]
-                               text-white rounded-xl font-medium transition-all duration-150"
+            {/* Sticky bottom bar for selection */}
+            {selectedPages.size > 0 && (
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-50">
+                <div className="max-w-2xl mx-auto flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-700">{selectedPages.size}장 선택</span>
+                  <select
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    value={movingTo || ''}
+                    onChange={(e) => setMovingTo(e.target.value || null)}
                   >
-                    참여자 초대 시작하기
+                    <option value="">Day 이동...</option>
+                    {days.map(d => (
+                      <option key={d.id} value={d.id}>Day {d.day_number} · {d.date}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => movingTo && handleMoveSelected(movingTo)}
+                    disabled={!movingTo}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium disabled:opacity-50 transition-colors"
+                  >
+                    이동
                   </button>
-                )}
+                  <button
+                    onClick={() => { setSelectedPages(new Set()); setMovingTo(null); }}
+                    className="text-gray-400 text-sm"
+                  >
+                    취소
+                  </button>
+                </div>
               </div>
             )}
           </div>
