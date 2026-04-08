@@ -157,16 +157,33 @@ export default function TripAdmin() {
     }
   };
 
+  const [finalizeStep, setFinalizeStep] = useState(0);
+  const FINALIZE_STEPS = [
+    '사진 텍스트 합성 중...',
+    'Sweetbook에 사진 업로드 중...',
+    '표지 생성 중...',
+    '내지 페이지 구성 중...',
+    '포토북 확정 중...',
+  ];
+
   const handleFinalize = async () => {
     if (!tripId || !confirm('포토북을 확정하시겠습니까? 확정 후에는 참여자가 더 이상 메시지를 작성할 수 없습니다.')) return;
     setFinalizing(true);
+    setFinalizeStep(0);
+    // 단계별 진행 시뮬레이션 (API는 단일 요청이지만 사용자에게 진행 상황 표시)
+    const stepInterval = setInterval(() => {
+      setFinalizeStep((s) => (s < FINALIZE_STEPS.length - 1 ? s + 1 : s));
+    }, 5000);
     try {
       await finalizeBook(tripId, adminToken);
+      clearInterval(stepInterval);
       await loadData();
     } catch (err: any) {
+      clearInterval(stepInterval);
       setError(err.message);
     } finally {
       setFinalizing(false);
+      setFinalizeStep(0);
     }
   };
 
@@ -546,8 +563,21 @@ export default function TripAdmin() {
                              disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100
                              text-white rounded-xl font-medium transition-all duration-150"
                 >
-                  {finalizing ? '포토북 생성 중...' : '포토북 확정하기'}
+                  {finalizing ? FINALIZE_STEPS[finalizeStep] : '포토북 확정하기'}
                 </button>
+                {finalizing && (
+                  <div className="mt-3 space-y-2">
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div
+                        className="bg-orange-500 h-1.5 rounded-full transition-all duration-1000"
+                        style={{ width: `${((finalizeStep + 1) / FINALIZE_STEPS.length) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 text-center">
+                      {finalizeStep + 1} / {FINALIZE_STEPS.length} 단계
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
