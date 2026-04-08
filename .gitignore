@@ -9,3 +9,13 @@ uploads/
 *.egg-info/
 .gstack/
 tmp-composites/
+.understand-anything/
+diaryBook-demo-findings.md
+findings.md
+jd.md
+progress.md
+task_plan.md
+docs/google-form-answers.md
+docs/ONBOARDING.md
+frontend/README.md
+frontend/src/assets/
