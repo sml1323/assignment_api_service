@@ -7,3 +7,5 @@ dist/
 uploads/
 .vite/
 *.egg-info/
+.gstack/
+tmp-composites/

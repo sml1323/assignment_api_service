@@ -157,19 +157,7 @@ def build_tripbook(trip, pages_with_messages, cover_path: str | None = None) -> 
             )
             page_count += 1
 
-            # 4c. 텍스트 페이지 (bottom zone 메시지)
-            if bottom_text:
-                client.contents.insert(
-                    book_uid,
-                    template_uid=CONTENT_B_TEMPLATE,
-                    parameters={
-                        "monthNum": month_num,
-                        "dayNum": day_num,
-                        "diaryText": bottom_text,
-                    },
-                    break_before="page",
-                )
-                page_count += 1
+            # 4c. 하단 텍스트는 Pillow에서 사진에 합성됨 (별도 페이지 불필요)
 
     # 5. 패딩: target = max(24, ceil_to_even(page_count))
     target = max(MIN_PAGES, page_count + (page_count % 2))

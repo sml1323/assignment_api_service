@@ -250,6 +250,21 @@ export async function updateDay(
   return handleResponse(res);
 }
 
+export async function updatePage(
+  pageId: string,
+  adminToken: string,
+  data: { subtitle?: string; caption?: string },
+): Promise<void> {
+  const params = new URLSearchParams();
+  if (data.subtitle !== undefined) params.set('subtitle', data.subtitle);
+  if (data.caption !== undefined) params.set('caption', data.caption);
+  const res = await fetch(`${BASE}/api/pages/${pageId}?${params.toString()}`, {
+    method: 'PUT',
+    headers: adminHeaders(adminToken),
+  });
+  return handleResponse(res);
+}
+
 export async function movePage(
   pageId: string,
   adminToken: string,

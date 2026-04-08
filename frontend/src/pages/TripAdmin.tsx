@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { getTrip, getPages, getDays, uploadPagesBulk, updateTripStatus, finalizeBook, getAuditLog, getOrderStatus, getCreditBalance, getCreditTransactions, sandboxCharge, updateDay, movePage, setCover } from '../lib/api';
+import { getTrip, getPages, getDays, uploadPagesBulk, updateTripStatus, finalizeBook, getAuditLog, getOrderStatus, getCreditBalance, getCreditTransactions, sandboxCharge, updateDay, movePage, setCover, updatePage } from '../lib/api';
 import type { Trip, Page, TripDay, AuditEntry } from '../lib/api';
 
 const statusLabels: Record<string, string> = {
@@ -40,6 +40,8 @@ export default function TripAdmin() {
   const [movingTo, setMovingTo] = useState<string | null>(null);
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [editingSubtitle, setEditingSubtitle] = useState<string | null>(null);
+  const [editSubtitleValue, setEditSubtitleValue] = useState('');
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [orderDetail, setOrderDetail] = useState<any>(null);
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
@@ -132,6 +134,16 @@ export default function TripAdmin() {
     try {
       await updateDay(tripId, dayId, adminToken, { title: editTitle });
       setEditingDay(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleSubtitleSave = async (pageId: string) => {
+    try {
+      await updatePage(pageId, adminToken, { subtitle: editSubtitleValue });
+      setEditingSubtitle(null);
       await loadData();
     } catch (err: any) {
       setError(err.message);
@@ -384,38 +396,62 @@ export default function TripAdmin() {
                       {day.pages.map((page) => {
                         const isSelected = selectedPages.has(page.id);
                         return (
-                          <div
-                            key={page.id}
-                            className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer group ${
-                              isSelected ? 'ring-2 ring-orange-500' : ''
-                            }`}
-                            onClick={() => togglePageSelection(page.id)}
-                          >
-                            <img src={page.photo_url} alt="" className="w-full h-full object-cover" />
-                            {/* Checkbox overlay */}
-                            <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              isSelected
-                                ? 'bg-orange-500 border-orange-500'
-                                : 'border-white/80 bg-black/20 opacity-0 group-hover:opacity-100'
-                            }`}>
-                              {isSelected && (
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
+                          <div key={page.id} className="space-y-1">
+                            <div
+                              className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer group ${
+                                isSelected ? 'ring-2 ring-orange-500' : ''
+                              }`}
+                              onClick={() => togglePageSelection(page.id)}
+                            >
+                              <img src={page.photo_url} alt="" className="w-full h-full object-cover" />
+                              {/* Checkbox overlay */}
+                              <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? 'bg-orange-500 border-orange-500'
+                                  : 'border-white/80 bg-black/20 opacity-0 group-hover:opacity-100'
+                              }`}>
+                                {isSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              {/* Cover badge */}
+                              {trip.cover_image === page.photo_url && (
+                                <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">표지</div>
+                              )}
+                              {/* Set as cover (on hover) */}
+                              {trip.cover_image !== page.photo_url && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleSetCover(page.id); }}
+                                  className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  표지로
+                                </button>
                               )}
                             </div>
-                            {/* Cover badge */}
-                            {trip.cover_image === page.photo_url && (
-                              <div className="absolute top-2 right-2 bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium">표지</div>
-                            )}
-                            {/* Set as cover (on hover) */}
-                            {trip.cover_image !== page.photo_url && (
+                            {/* Subtitle edit */}
+                            {editingSubtitle === page.id ? (
+                              <div className="space-y-1">
+                                <input
+                                  value={editSubtitleValue}
+                                  onChange={(e) => setEditSubtitleValue(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && handleSubtitleSave(page.id)}
+                                  className="w-full px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-200"
+                                  placeholder="소제목 입력"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleSubtitleSave(page.id)} className="text-orange-500 text-xs">저장</button>
+                                  <button onClick={() => setEditingSubtitle(null)} className="text-gray-400 text-xs">취소</button>
+                                </div>
+                              </div>
+                            ) : (
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleSetCover(page.id); }}
-                                className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => { e.stopPropagation(); setEditingSubtitle(page.id); setEditSubtitleValue(page.subtitle || ''); }}
+                                className="text-xs text-gray-400 hover:text-gray-600 truncate block w-full text-left"
                               >
-                                표지로
-                              </button>
+                                {page.subtitle || '소제목 추가...'}</button>
                             )}
                           </div>
                         );

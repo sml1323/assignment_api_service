@@ -13,7 +13,7 @@ from ..services.sweetbook import (
     cancel_order, update_order_shipping, get_client,
 )
 from bookprintapi import ApiError
-from ..services.image import compose_photo_with_text, UPLOAD_DIR
+from ..services.image import compose_photo_with_text, compose_photo_with_bottom_text, UPLOAD_DIR
 from ..services.audit import log_action
 
 router = APIRouter(prefix="/api/trips", tags=["books"])
@@ -77,23 +77,23 @@ def finalize_book(
                     "position_y": z.message.position_y,
                 })
 
-        # Get original photo path
-        photo_rel = page.photo_url.lstrip("/")
-        photo_path = str(Path(__file__).parent.parent.parent / photo_rel)
-
-        if overlay_texts:
-            composite_path = compose_photo_with_text(
-                photo_path, overlay_texts, output_dir=f"{trip_id}/composites"
-            )
-        else:
-            composite_path = photo_path
-
         # Bottom zones (3-4): collect as text
         bottom_parts = []
         for z in zones:
             if z.zone_number > 2 and z.message:
                 bottom_parts.append(f"{z.message.author_name}: {z.message.content}")
         bottom_text = "\n\n".join(bottom_parts) if bottom_parts else ""
+
+        # Get original photo path
+        photo_rel = page.photo_url.lstrip("/")
+        photo_path = str(Path(__file__).parent.parent.parent / photo_rel)
+
+        if overlay_texts or bottom_text:
+            composite_path = compose_photo_with_bottom_text(
+                photo_path, overlay_texts, bottom_text, output_dir=f"{trip_id}/composites"
+            )
+        else:
+            composite_path = photo_path
 
         pages_data[page.id] = (page, composite_path, bottom_text)
 
