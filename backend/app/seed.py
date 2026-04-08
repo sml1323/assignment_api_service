@@ -215,8 +215,8 @@ def seed():
         print(f"\n✅ 시딩 완료!")
         print(f"   {len(JEJU_PHOTOS)}개 페이지, {len(MESSAGES)}개 메시지")
         print(f"\n=== 접속 정보 ===")
-        print(f"   주최자 대시보드: http://localhost:5173/trip/{trip.id}/admin?token={trip.admin_token}")
-        print(f"   참여자 링크:     http://localhost:5173/join/{trip.share_token}")
+        print(f"   주최자 대시보드: http://localhost:8000/trip/{trip.id}/admin?token={trip.admin_token}")
+        print(f"   참여자 링크:     http://localhost:8000/join/{trip.share_token}")
 
     finally:
         db.close()

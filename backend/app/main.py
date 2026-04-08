@@ -1,4 +1,4 @@
-"""TripBook — 여행 포토북 협업 서비스 API"""
+"""CeleBook — 여행 포토북 협업 서비스 API"""
 
 from pathlib import Path
 
@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 app = FastAPI(
-    title="TripBook API",
+    title="CeleBook API",
     description="여행 포토북 협업 서비스 — 함께 만드는 여행의 추억",
     version="1.0.0",
 )
@@ -41,7 +41,7 @@ app.include_router(credits_router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "tripbook"}
+    return {"status": "ok", "service": "celebook"}
 
 
 # Uploaded images

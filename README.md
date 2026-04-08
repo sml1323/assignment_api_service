@@ -89,12 +89,30 @@ docker compose up --build
 | `GET /credits/transactions` | 충전금 거래 내역 |
 | `POST /credits/sandbox/charge` | Sandbox 테스트 충전 |
 
+### 자체 백엔드 API
+
+| API | 용도 |
+|-----|------|
+| `POST /api/auth/register`, `POST /api/auth/login` | 회원가입/로그인 |
+| `GET /api/auth/my/trips` | 내 여행 목록 |
+| `POST /api/trips` | 여행 생성 (Day 자동 생성) |
+| `GET /api/trips/:id/days` | Day 목록 + 사진 조회 |
+| `PATCH /api/trips/:id/days/:dayId` | Day 제목/설명 수정 |
+| `PATCH /api/trips/:id/cover` | 표지 사진 지정 |
+| `POST /api/trips/:id/pages/bulk` | 사진 일괄 업로드 |
+| `PATCH /api/pages/:id/move` | 사진 Day 간 이동 |
+| `POST /api/trips/:id/messages` | 메시지 작성 (존 선점) |
+| `POST /api/trips/:id/finalize` | Book Print API 연동 확정 |
+| `POST /api/trips/:id/order` | 주문 생성 |
+| `GET /api/trips/:id/audit` | 활동 타임라인 조회 |
+| `POST /api/webhooks/sweetbook` | Webhook 수신 |
+
 ### Webhook 이벤트
 
 | 이벤트 | 처리 |
 |-------|------|
-| `order.status_changed` | 주문 상태 업데이트 + AuditLog 기록 |
-| `order.shipped` | 배송 정보 업데이트 |
+| `order.status_changed` | WebhookLog 저장 + AuditLog 기록 |
+| `order.shipped` | WebhookLog 저장 + AuditLog 기록 |
 
 ### 사용한 템플릿
 
@@ -102,7 +120,7 @@ docker compose up --build
 |-----------|------|------|
 | `7CO28K1SttwL` | 표지 (구글포토북C) | 표지 — coverPhoto + subtitle + dateRange |
 | `5ADDkCtrodEJ` | 내지_photo | 사진 페이지 — Pillow 합성 이미지 + dayLabel |
-| `3mjKd8kcaVzT` | 내지b | Day 간지 + 텍스트 페이지 — monthNum + dayNum + diaryText |
+| `3mjKd8kcaVzT` | 내지b | Day 간지 페이지 — monthNum + dayNum + diaryText |
 | `5NxuQPBMyuTm` | 빈내지 | 최소 24페이지 충족용 패딩 |
 
 ---
@@ -112,15 +130,15 @@ docker compose up --build
 ```mermaid
 flowchart TD
     A["확정하기 버튼 클릭"] --> B["POST /books<br/>책 생성 (PHOTOBOOK_A4_SC)"]
-    B --> C["Pillow 텍스트 합성<br/>(오버레이 존 → 사진에 베이킹)"]
+    B --> C["Pillow 텍스트 합성<br/>(오버레이 + 하단 댓글 → 사진에 합성)"]
     C --> D["POST /books/{id}/photos<br/>합성 이미지 업로드"]
     D --> E["POST /books/{id}/cover<br/>표지 생성 (구글포토북C)"]
-    E --> F["POST /books/{id}/contents<br/>Day별 반복: 간지 + 사진 + 텍스트"]
+    E --> F["POST /books/{id}/contents<br/>Day별 반복: 간지 + 사진"]
     F --> G["POST /books/{id}/finalization<br/>책 확정"]
     G --> H["POST /orders/estimate<br/>견적 조회"]
     H --> I["POST /orders<br/>주문 생성 + 충전금 차감"]
     I --> J["Webhook 수신<br/>서명 검증 + idempotency"]
-    J --> K["DB 업데이트 + AuditLog"]
+    J --> K["WebhookLog + AuditLog 기록"]
 
     style A fill:#f97316,color:#fff
     style G fill:#059669,color:#fff
