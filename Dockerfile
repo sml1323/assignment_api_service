@@ -32,9 +32,6 @@ COPY dummy-data/ ./dummy-data/
 # Frontend build from stage 1
 COPY --from=frontend /app/frontend/dist ./frontend/dist
 
-# .env.example as fallback
-COPY .env.example ./.env.example
-
 EXPOSE 8000
 
 # Seed + run
