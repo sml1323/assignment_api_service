@@ -25,7 +25,12 @@ export default function Landing() {
 
   useEffect(() => {
     if (userToken) {
-      getMyTrips().then(setMyTrips).catch(() => {});
+      getMyTrips().then(setMyTrips).catch(() => {
+        // 토큰이 만료/무효 → 자동 로그아웃
+        localStorage.removeItem('user_token');
+        localStorage.removeItem('username');
+        window.location.reload();
+      });
     }
   }, [userToken]);
 
